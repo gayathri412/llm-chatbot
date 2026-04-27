@@ -68,13 +68,16 @@ for q, r in chat_history:
 user_input = st.chat_input("Ask something...")
 
 if user_input:
+    # show user message
     st.chat_message("user").write(user_input)
 
+    # generate response
     response = answer_query(user_input)
 
+    # show assistant message
     st.chat_message("assistant").write(response)
 
-    # Save chat
+    # save chat
     chat_history.append((user_input, response))
 # ---------- SIDEBAR ----------
 st.sidebar.title("💬 SNTI")
@@ -147,7 +150,6 @@ if page == "Chat":
 
     # ---------- INPUT ----------
     user_input = st.chat_input("Ask anything...")
-
     if user_input:
         st.chat_message("user").write(user_input)
 
@@ -156,13 +158,12 @@ if page == "Chat":
 
         st.chat_message("assistant").write(response)
 
-        # store in chat
+    # store in chat
         chat_history.append((user_input, response))
 
-        # ---------- GLOBAL MEMORY ----------
         if "global_history" not in st.session_state:
-            st.session_state.global_history = []
-
+              st.session_state.global_history = []
+        
         st.session_state.global_history.append(("user", user_input))
         st.session_state.global_history.append(("assistant", response))
 # =========================================
