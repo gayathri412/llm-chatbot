@@ -26,6 +26,8 @@ none
     ]
 
     decision = decision.split()[0]
+    
+    print("Tool selected:", decision)
 
     return decision
 
