@@ -1,5 +1,18 @@
-from llm.client import chat_completion
+from app.tools import calculator_tool, file_analyzer_tool
 from data.json_fallback import fetch_context
+from llm.client import chat_completion
+
+
+def decide_tool(query: str):
+    query = query.lower()
+
+    if any(char.isdigit() for char in query):
+        return "calculator"
+
+    if "file" in query or "analyze" in query:
+        return "file"
+
+    return "none"
 
 
 def answer_query(query, model_choice="Llama"):
@@ -10,11 +23,20 @@ def answer_query(query, model_choice="Llama"):
     else:
         latest_question = query.strip()
 
-    # 🔍 Get context (RAG)
+    # 🔧 TOOL DECISION
+    tool = decide_tool(latest_question)
+
+    if tool == "calculator":
+        return calculator_tool(latest_question)
+
+    elif tool == "file":
+        return file_analyzer_tool(latest_question)
+
+    # 🔍 RAG context
     context = fetch_context(latest_question)
     context_text = "\n".join(context) if context else ""
 
-    # 🧠 Improved Prompt
+    # 🧠 FINAL PROMPT
     final_prompt = f"""
 You are a smart and helpful AI assistant.
 
@@ -35,13 +57,13 @@ Context (if available):
 Answer:
 """
 
-    # 💬 Messages format (better than build_prompt)
+    # 💬 Messages
     messages = [
         {"role": "system", "content": "You are a helpful AI assistant."},
         {"role": "user", "content": final_prompt}
     ]
 
-    # 🤖 Get response
+    # 🤖 LLM response
     response = chat_completion(messages, model_choice)
 
     return response
