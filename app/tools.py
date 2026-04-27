@@ -1,27 +1,41 @@
 from llm.client import chat_completion
 
+def chunk_text(text, chunk_size=1500):
+    return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+
+
 def file_analyzer_tool(text: str, model_choice="Llama"):
 
-    prompt = f"""
-You are an AI document analyst.
+    chunks = chunk_text(text)
+    summaries = []
 
-Analyze the following document and provide:
+    for chunk in chunks[:3]:  # limit to avoid overload
+        prompt = f"""
+Summarize this part of a document:
 
-1. Summary
-2. Key Points
-3. Important Insights
+{chunk}
+"""
 
-Document:
-{text[:3000]}
+        messages = [
+            {"role": "system", "content": "You are a document summarizer."},
+            {"role": "user", "content": prompt}
+        ]
 
-Give a clear and structured answer.
+        summary = chat_completion(messages, model_choice)
+        summaries.append(summary)
+
+    # 🔥 Combine summaries
+    final_prompt = f"""
+Combine the following summaries into one clear final summary:
+
+{summaries}
 """
 
     messages = [
-        {"role": "system", "content": "You are a document analysis expert."},
-        {"role": "user", "content": prompt}
+        {"role": "system", "content": "You are a summarization expert."},
+        {"role": "user", "content": final_prompt}
     ]
 
-    response = chat_completion(messages, model_choice)
+    final_response = chat_completion(messages, model_choice)
 
-    return response
+    return final_response
