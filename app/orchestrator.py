@@ -2,6 +2,32 @@ from app.tools import calculator_tool, file_analyzer_tool
 from data.json_fallback import fetch_context
 from llm.client import chat_completion
 
+def decide_tool_llm(query, model_choice):
+
+    tool_prompt = f"""
+You are an AI assistant that selects tools.
+
+Available tools:
+1. calculator → for math calculations
+2. file → for analyzing text or files
+3. none → for normal questions
+
+Question: {query}
+
+Reply ONLY with:
+calculator
+file
+none
+"""
+
+    messages = [
+        {"role": "system", "content": "You are a tool selector."},
+        {"role": "user", "content": tool_prompt}
+    ]
+
+    decision = decision.split()[0]
+
+    return decision
 
 def decide_tool(query: str):
     query = query.lower()
@@ -23,8 +49,7 @@ def answer_query(query, model_choice="Llama"):
     else:
         latest_question = query.strip()
 
-    # 🔧 TOOL DECISION
-    tool = decide_tool(latest_question)
+    tool = decide_tool_llm(latest_question, model_choice)
 
     if tool == "calculator":
         return calculator_tool(latest_question)
