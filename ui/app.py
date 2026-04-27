@@ -89,7 +89,23 @@ if page == "Chat":
 
     chat_history = st.session_state.chats[st.session_state.current_chat]
 
-    # ---------- HOME SCREEN MODEL NAME ----------
+    # ---------- FILE UPLOAD (ADD HERE) ----------
+    uploaded_file = st.file_uploader("Upload a file", type=["txt", "pdf"])
+
+    file_text = ""
+    if uploaded_file:
+        if uploaded_file.type == "text/plain":
+            file_text = uploaded_file.read().decode("utf-8")
+
+        elif uploaded_file.type == "application/pdf":
+            import pdfplumber
+            with pdfplumber.open(uploaded_file) as pdf:
+                for page in pdf.pages:
+                    file_text += page.extract_text() or ""
+
+        st.success("File uploaded successfully ✅")
+
+    # ---------- HOME SCREEN ----------
     if not chat_history:
         st.markdown(
             f"""
@@ -107,13 +123,20 @@ if page == "Chat":
         st.chat_message("assistant").write(r)
 
     # ---------- INPUT ----------
-    user_input = st.chat_input("Ask anything...")
+    user_input = st.chat_input("Ask anything...", key="main_chat")
 
     if user_input:
         st.chat_message("user").write(user_input)
 
         with st.spinner("Thinking..."):
-            response = answer_query(user_input, model_choice)
+            # 👉 PASS FILE CONTENT IF EXISTS
+            if file_text:
+                response = answer_query(
+                    user_input + "\n\nFile Content:\n" + file_text,
+                    model_choice
+                )
+            else:
+                response = answer_query(user_input, model_choice)
 
         st.chat_message("assistant").write(response)
 
