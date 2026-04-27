@@ -9,7 +9,7 @@ You are an AI assistant that selects tools.
 
 Available tools:
 1. calculator → for math calculations
-2. file → for analyzing text or files
+2. file → for summarizing, analyzing, or understanding uploaded documents
 3. none → for normal questions
 
 Question: {query}
@@ -26,7 +26,7 @@ none
     ]
 
     decision = decision.split()[0]
-    
+
     print("Tool selected:", decision)
 
     return decision
@@ -57,7 +57,7 @@ def answer_query(query, model_choice="Llama"):
         return calculator_tool(latest_question)
 
     elif tool == "file":
-        return file_analyzer_tool(latest_question)
+        return file_analyzer_tool(latest_question, model_choice)
 
     # 🔍 RAG context
     context = fetch_context(latest_question)
