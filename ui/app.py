@@ -487,7 +487,7 @@ except:
 # =========================================
 # 📱 APPS PAGE
 # =========================================
-elif page == "Apps":
+if page == "Apps":
     st.title("📱 AI Tools Hub")
 
     import pandas as pd
