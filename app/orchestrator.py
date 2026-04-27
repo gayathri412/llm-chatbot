@@ -1,36 +1,47 @@
-from prompts.compose import build_prompt
 from llm.client import chat_completion
 from data.json_fallback import fetch_context
 
+
 def answer_query(query, model_choice="Llama"):
 
-    # 🔍 Extract latest question properly
+    # 🔍 Extract latest question
     if "The user now asks:" in query:
-        latest_question = query.split("The user now asks:")[-1]
+        latest_question = query.split("The user now asks:")[-1].strip()
     else:
-        latest_question = query
+        latest_question = query.strip()
 
-    # 🔍 RAG context
+    # 🔍 Get context (RAG)
     context = fetch_context(latest_question)
-    context_text = "\n".join(context) if context else "No relevant knowledge found."
+    context_text = "\n".join(context) if context else ""
 
-    # 🧠 Final prompt
+    # 🧠 Improved Prompt
     final_prompt = f"""
-You are an intelligent assistant.
+You are a smart and helpful AI assistant.
 
-Use the knowledge below to answer the question accurately.
+Answer the user's question clearly, accurately, and confidently.
 
-Knowledge:
+Instructions:
+- If context is provided, use it.
+- If context is missing or incomplete, use your general knowledge.
+- Do NOT say "I don't have information" unless absolutely necessary.
+- Explain in a simple and clear way.
+
+User Question:
+{latest_question}
+
+Context (if available):
 {context_text}
 
-Conversation:
-{query}
-
-Answer clearly and correctly.
+Answer:
 """
 
-    messages = build_prompt(final_prompt)
+    # 💬 Messages format (better than build_prompt)
+    messages = [
+        {"role": "system", "content": "You are a helpful AI assistant."},
+        {"role": "user", "content": final_prompt}
+    ]
 
+    # 🤖 Get response
     response = chat_completion(messages, model_choice)
 
     return response
