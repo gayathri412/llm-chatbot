@@ -8,3 +8,4 @@ reportlab
 pillow
 pytesseract
 google-generativeai
+python-dotenv
