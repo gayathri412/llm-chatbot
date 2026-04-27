@@ -1,0 +1,14 @@
+[
+  {
+    "title": "Artificial Intelligence",
+    "body": "Artificial Intelligence is the simulation of human intelligence in machines."
+  },
+  {
+    "title": "Machine Learning",
+    "body": "Machine Learning is a subset of AI that allows systems to learn from data."
+  },
+  {
+    "title": "Deep Learning",
+    "body": "Deep Learning uses neural networks with multiple layers to learn patterns."
+  }
+]

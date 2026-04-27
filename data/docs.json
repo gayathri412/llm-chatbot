@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "title": "Phishing",
+    "body": "Phishing attacks trick users into revealing sensitive information through fake emails or websites."
+  },
+  {
+    "id": 2,
+    "title": "SQL Injection",
+    "body": "SQL injection is a vulnerability that allows attackers to manipulate database queries."
+  },
+  {
+    "id": 3,
+    "title": "Cross Site Scripting",
+    "body": "XSS allows attackers to inject malicious scripts into web pages."
+  }
+]
