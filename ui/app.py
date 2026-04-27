@@ -5,14 +5,36 @@ from data.context import fetch_context
 import streamlit as st
 from app.orchestrator import answer_query
 
-# ---------- GLOBAL ----------
-import streamlit as st
+# ---------- PAGE CONFIG ----------
+st.set_page_config(page_title="AI Assistant", page_icon="🤖", layout="wide")
 
+st.title("🤖 AI Assistant Platform")
+st.caption("Chat • Research • Tools • Analysis")
+
+# ---------- SESSION STATE ----------
 if "history" not in st.session_state:
     st.session_state.history = []
 
-if "global_history" not in st.session_state:
-    st.session_state.global_history = []
+# ---------- DISPLAY OLD CHAT ----------
+for msg in st.session_state.history:
+    st.chat_message(msg["role"]).write(msg["content"])
+
+# ---------- USER INPUT ----------
+user_input = st.chat_input("Ask something...")
+
+if user_input:
+    # Show user message
+    st.chat_message("user").write(user_input)
+
+    # Get response
+    response = answer_query(user_input)
+
+    # Show assistant response
+    st.chat_message("assistant").write(response)
+
+    # Save chat history
+    st.session_state.history.append({"role": "user", "content": user_input})
+    st.session_state.history.append({"role": "assistant", "content": response})
 
 # ---------- UI STYLE ----------
 st.markdown("""
@@ -35,6 +57,25 @@ if "chats" not in st.session_state:
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = "Chat 1"
 
+chat_history = st.session_state.chats[st.session_state.current_chat]
+
+# ---------- DISPLAY OLD CHAT ----------
+for q, r in chat_history:
+    st.chat_message("user").write(q)
+    st.chat_message("assistant").write(r)
+
+# ---------- INPUT ----------
+user_input = st.chat_input("Ask something...")
+
+if user_input:
+    st.chat_message("user").write(user_input)
+
+    response = answer_query(user_input)
+
+    st.chat_message("assistant").write(response)
+
+    # Save chat
+    chat_history.append((user_input, response))
 # ---------- SIDEBAR ----------
 st.sidebar.title("💬 SNTI")
 
