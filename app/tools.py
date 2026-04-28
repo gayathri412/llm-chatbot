@@ -39,47 +39,32 @@ def file_analyzer_tool(text: str, model_choice="Llama"):
 
     for chunk in chunks[:2]:
         prompt = f"""
-You are an expert document summarizer.
+Create a clean and well-structured summary.
 
-Create a structured summary of this text with:
-- Title (if possible)
-- 4–6 bullet key points
-- 1–2 line brief overview
+FORMAT STRICTLY:
 
-Keep it clear and concise.
-
-Text:
-{chunk}
-
-Structured Summary:
-"""
-        messages = [
-            {"role": "system", "content": "You summarize documents clearly."},
-            {"role": "user", "content": prompt}
-        ]
-
-        part = chat_completion(messages, model_choice)
-        partials.append(part)
-
-    # 🔥 combine
-    final_prompt = f"""
-Merge these into ONE clean structured summary.
-
-Format:
 ## Title
-**Overview:**
-- ...
-**Key Points:**
-- ...
-- ...
-- ...
+
+### Overview
+(2–3 lines summary)
+
+### Key Statistics
+- Point 1
+- Point 2
+- Point 3
+
+### Risk Factors / Insights
+- Insight 1
+- Insight 2
+- Insight 3
+
+RULES:
+- Use bullet points
+- Keep it clean and readable
+- Do NOT write long paragraphs
 
 Content:
 {partials}
-"""
-    messages = [
-        {"role": "system", "content": "You merge summaries cleanly."},
-        {"role": "user", "content": final_prompt}
-    ]
 
-    return chat_completion(messages, model_choice)
+Final Output:
+"""
