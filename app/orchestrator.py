@@ -9,7 +9,7 @@ You are an AI assistant that selects tools.
 
 Available tools:
 1. calculator → for math calculations
-2. file → for summarizing, analyzing, or understanding uploaded documents
+2. file → for analyzing documents
 3. none → for normal questions
 
 Question: {query}
@@ -25,23 +25,14 @@ none
         {"role": "user", "content": tool_prompt}
     ]
 
+    # ✅ FIRST get decision
+    decision = chat_completion(messages, model_choice)
+
+    # ✅ THEN clean it
+    decision = decision.strip().lower()
     decision = decision.split()[0]
 
-    print("Tool selected:", decision)
-
     return decision
-
-def decide_tool(query: str):
-    query = query.lower()
-
-    if any(char.isdigit() for char in query):
-        return "calculator"
-
-    if "file" in query or "analyze" in query:
-        return "file"
-
-    return "none"
-
 
 from app.tools import calculator_tool, file_analyzer_tool
 
