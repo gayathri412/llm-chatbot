@@ -2,6 +2,8 @@ from app.tools import calculator_tool, file_analyzer_tool
 from data.json_fallback import fetch_context
 from llm.client import chat_completion
 
+
+# 🔧 TOOL DECISION (LLM-based)
 def decide_tool_llm(query, model_choice):
 
     tool_prompt = f"""
@@ -25,17 +27,22 @@ none
         {"role": "user", "content": tool_prompt}
     ]
 
-    # ✅ FIRST get decision
-    decision = chat_completion(messages, model_choice)
+    try:
+        decision = chat_completion(messages, model_choice)
 
-    # ✅ THEN clean it
-    decision = decision.strip().lower()
-    decision = decision.split()[0]
+        if not decision:
+            return "none"
 
-    return decision
+        decision = decision.strip().lower()
+        decision = decision.split()[0]
 
-from app.tools import calculator_tool, file_analyzer_tool
+        return decision
 
+    except Exception:
+        return "none"
+
+
+# 🧠 MAIN FUNCTION
 def answer_query(query, model_choice="Llama"):
 
     # 🔍 Extract latest question
@@ -44,11 +51,11 @@ def answer_query(query, model_choice="Llama"):
     else:
         latest_question = query.strip()
 
-
+    # 📄 FILE HANDLING (large input)
     if len(query) > 1000:
-            return file_analyzer_tool(query, model_choice)
+        return file_analyzer_tool(query, model_choice)
 
-    # 🔧 TOOL DECISION (normal queries)
+    # 🔧 TOOL DECISION
     tool = decide_tool_llm(latest_question, model_choice)
 
     if tool == "calculator":
@@ -62,18 +69,17 @@ def answer_query(query, model_choice="Llama"):
     final_prompt = f"""
 You are a smart and helpful AI assistant.
 
-Answer the user's question clearly, accurately, and confidently.
+Answer the user's question clearly and accurately.
 
 Instructions:
-- If context is provided, use it.
-- If context is missing or incomplete, use your general knowledge.
-- Do NOT say "I don't have information" unless absolutely necessary.
-- Explain in a simple and clear way.
+- Use context if available
+- Otherwise use general knowledge
+- Keep explanation simple and clear
 
 User Question:
 {latest_question}
 
-Context (if available):
+Context:
 {context_text}
 
 Answer:
@@ -84,4 +90,7 @@ Answer:
         {"role": "user", "content": final_prompt}
     ]
 
-    return chat_completion(messages, model_choice)
+    try:
+        return chat_completion(messages, model_choice)
+    except Exception as e:
+        return f"Error: {str(e)}"
