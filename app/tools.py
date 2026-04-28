@@ -24,39 +24,62 @@ def chunk_text(text, chunk_size=800):
 
 
 # 📄 File Analyzer Tool
+maries = []
+
+
+from llm.client import chat_completion
+
 def file_analyzer_tool(text: str, model_choice="Llama"):
 
-    chunks = chunk_text(text)
-    summaries = []
+    # 🔪 chunk
+    chunk_size = 800
+    chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
-    for chunk in chunks[:2]:  # limit to avoid overload
+    partials = []
+
+    for chunk in chunks[:2]:
         prompt = f"""
-Summarize this part of a document:
+You are an expert document summarizer.
 
+Create a structured summary of this text with:
+- Title (if possible)
+- 4–6 bullet key points
+- 1–2 line brief overview
+
+Keep it clear and concise.
+
+Text:
 {chunk}
-"""
 
+Structured Summary:
+"""
         messages = [
-            {"role": "system", "content": "You are a document summarizer."},
+            {"role": "system", "content": "You summarize documents clearly."},
             {"role": "user", "content": prompt}
         ]
 
-        summary = chat_completion(messages, model_choice)
-        summaries.append(summary)
+        part = chat_completion(messages, model_choice)
+        partials.append(part)
 
-    # 🔥 Combine summaries
+    # 🔥 combine
     final_prompt = f"""
-Combine the following summaries into one clear final summary:
+Merge these into ONE clean structured summary.
 
-{summaries}
+Format:
+## Title
+**Overview:**
+- ...
+**Key Points:**
+- ...
+- ...
+- ...
+
+Content:
+{partials}
 """
-
     messages = [
-        {"role": "system", "content": "You are a summarization expert."},
+        {"role": "system", "content": "You merge summaries cleanly."},
         {"role": "user", "content": final_prompt}
     ]
 
-    final_response = chat_completion(messages, model_choice)
-
-    return final_response
-
+    return chat_completion(messages, model_choice)
