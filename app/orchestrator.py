@@ -1,4 +1,4 @@
-from app.tools import calculator_tool, file_analyzer_tool, document_qa_tool
+from app.tools import calculator_tool, file_analyzer_tool
 from data.json_fallback import fetch_context
 from llm.client import chat_completion
 
@@ -53,15 +53,10 @@ def answer_query(query, model_choice="Llama"):
     else:
         latest_question = query.strip()
 
-    # 🔥 FILE HANDLING (VERY IMPORTANT)
-    if len(query) > 1000:   # means file content is passed
 
-        # 👉 If user asked a question → Q&A
-       question_words = ["what", "why", "how", "explain", "describe", "tell", "give", "list"]
-       if any(word in latest_question.lower() for word in question_words):
-              return document_qa_tool(latest_question, query, model_choice)
-       
-       return file_analyzer_tool(query, model_choice)
+    if len(query) > 1000:
+            return file_analyzer_tool(query, model_choice)
+
     # 🔧 TOOL DECISION (normal queries)
     tool = decide_tool_llm(latest_question, model_choice)
 

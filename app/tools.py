@@ -59,3 +59,4 @@ Combine the following summaries into one clear final summary:
     final_response = chat_completion(messages, model_choice)
 
     return final_response
+
