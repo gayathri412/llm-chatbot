@@ -61,20 +61,36 @@ Combine the following summaries into one clear final summary:
     return final_response
 
 
+from llm.client import chat_completion
+
+
 def document_qa_tool(question: str, text: str, model_choice="Llama"):
 
-    chunks = chunk_text(text)
+    # 🔪 Chunk text
+    chunk_size = 800
+    chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+
     answers = []
 
-    for chunk in chunks[:2]:  # limit
+    # 🔍 Process chunks
+    for chunk in chunks[:2]:  # limit to avoid token overload
+
         prompt = f"""
-Answer the question based ONLY on this context.
+You are an AI assistant answering questions from a document.
+
+STRICT RULES:
+- Answer ONLY the question
+- Keep answer SHORT (max 3–5 lines)
+- Do NOT summarize the whole document
+- Do NOT add extra information
 
 Context:
 {chunk}
 
 Question:
 {question}
+
+Answer:
 """
 
         messages = [
@@ -87,14 +103,24 @@ Question:
 
     # 🔥 Combine answers
     final_prompt = f"""
-Combine these answers into one clear response:
+Combine the following answers into ONE short and precise answer.
 
+STRICT RULES:
+- Maximum 5 lines
+- Do NOT add extra details
+- Focus only on answering the question
+
+Answers:
 {answers}
+
+Final Answer:
 """
 
     messages = [
-        {"role": "system", "content": "You summarize answers."},
+        {"role": "system", "content": "You combine answers precisely."},
         {"role": "user", "content": final_prompt}
     ]
 
-    return chat_completion(messages, model_choice)
+    final_response = chat_completion(messages, model_choice)
+
+    return final_response
