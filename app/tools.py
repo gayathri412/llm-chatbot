@@ -80,9 +80,9 @@ You are an AI assistant answering questions from a document.
 
 STRICT RULES:
 - Answer ONLY the question
-- Keep answer SHORT (max 3–5 lines)
-- Do NOT summarize the whole document
-- Do NOT add extra information
+- Give Extra information if needed
+- Summarize the whole document
+-add extra information
 
 Context:
 {chunk}
@@ -103,12 +103,15 @@ Answer:
 
     # 🔥 Combine answers
     final_prompt = f"""
-Combine the following answers into ONE short and precise answer.
+Combine the following answers into precise answer and understandable.
 
 STRICT RULES:
-- Maximum 5 lines
-- Do NOT add extra details
+- Maximum More knowlegde
+- add extra details
 - Focus only on answering the question
+- Add Source where the answer came from 
+- Make annswers conversational 
+- even ask if Question and and Answers are Required
 
 Answers:
 {answers}
