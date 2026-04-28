@@ -79,10 +79,13 @@ def document_qa_tool(question: str, text: str, model_choice="Llama"):
 You are an AI assistant answering questions from a document.
 
 STRICT RULES:
-- Answer ONLY the question
-- Give Extra information if needed
+- Answer the question precisely
+- Give Extra information 
 - Summarize the whole document
--add extra information
+- add extra information Like examples, Advantages, Disadvantages, Methods used 
+- Add Source where the answer came from 
+- Make annswers conversational 
+- even ask if Question and and Answers are Required
 
 Context:
 {chunk}
