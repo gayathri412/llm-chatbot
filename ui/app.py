@@ -124,6 +124,8 @@ if page == "Chat":
         st.chat_message("user").write(q)
         st.chat_message("assistant").write(r)
 
+    from app.utils import create_pdf
+    
     pdf_file = create_pdf(response)
 
     with open(pdf_file, "rb") as f:
