@@ -1,8 +1,6 @@
 import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.context import fetch_context
-from app.utils import create_pdf
-    
 
 import streamlit as st
 from app.orchestrator import answer_query
@@ -125,19 +123,6 @@ if page == "Chat":
     for q, r in chat_history:
         st.chat_message("user").write(q)
         st.chat_message("assistant").write(r)
-
-   
-    pdf_file = create_pdf(response)
-
-    with open(pdf_file, "rb") as f:
-         st.download_button(
-            label="📥 Download as PDF",
-            data=f,
-            file_name="AI_Summary.pdf",
-            minw="application/pdf"
-        )    
-
-
     # ---------- INPUT ----------
     user_input = st.chat_input("Ask anything...", key="main_chat")
 
