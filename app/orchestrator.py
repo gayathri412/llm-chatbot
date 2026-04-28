@@ -43,7 +43,7 @@ def decide_tool(query: str):
     return "none"
 
 
-from app.tools import calculator_tool, file_analyzer_tool, document_qa_tool
+from app.tools import calculator_tool, file_analyzer_tool
 
 def answer_query(query, model_choice="Llama"):
 
