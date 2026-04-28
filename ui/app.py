@@ -104,7 +104,7 @@ if page == "Chat":
                     file_text += page.extract_text() or ""
         
         file_text = file_text[:5000]
-        
+
         st.success("File uploaded successfully ✅")
 
     # ---------- HOME SCREEN ----------
@@ -123,6 +123,17 @@ if page == "Chat":
     for q, r in chat_history:
         st.chat_message("user").write(q)
         st.chat_message("assistant").write(r)
+
+    pdf_file = create_pdf(response)
+
+    with open(pdf_file, "rb") as f:
+         st.download_button(
+            label="📥 Download as PDF",
+            data=f,
+            file_name="AI_Summary.pdf",
+            minw="application/pdf"
+        )    
+
 
     # ---------- INPUT ----------
     user_input = st.chat_input("Ask anything...", key="main_chat")
