@@ -1,9 +1,29 @@
+import re
 from llm.client import chat_completion
 
+
+# 🔢 Calculator Tool
+def calculator_tool(query: str):
+    try:
+        clean_query = re.sub(r"[^0-9+\-*/(). ]", "", query)
+
+        if not clean_query.strip():
+            return "⚠️ Invalid calculation"
+
+        result = eval(clean_query)
+
+        return f"🧮 Result: {result}"
+
+    except Exception:
+        return "⚠️ Calculation error"
+
+
+# 🔪 Chunking
 def chunk_text(text, chunk_size=800):
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
 
+# 📄 File Analyzer Tool
 def file_analyzer_tool(text: str, model_choice="Llama"):
 
     chunks = chunk_text(text)
@@ -39,3 +59,42 @@ Combine the following summaries into one clear final summary:
     final_response = chat_completion(messages, model_choice)
 
     return final_response
+
+
+def document_qa_tool(question: str, text: str, model_choice="Llama"):
+
+    chunks = chunk_text(text)
+    answers = []
+
+    for chunk in chunks[:2]:  # limit
+        prompt = f"""
+Answer the question based ONLY on this context.
+
+Context:
+{chunk}
+
+Question:
+{question}
+"""
+
+        messages = [
+            {"role": "system", "content": "You answer questions from documents."},
+            {"role": "user", "content": prompt}
+        ]
+
+        ans = chat_completion(messages, model_choice)
+        answers.append(ans)
+
+    # 🔥 Combine answers
+    final_prompt = f"""
+Combine these answers into one clear response:
+
+{answers}
+"""
+
+    messages = [
+        {"role": "system", "content": "You summarize answers."},
+        {"role": "user", "content": final_prompt}
+    ]
+
+    return chat_completion(messages, model_choice)

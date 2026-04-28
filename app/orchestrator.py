@@ -1,4 +1,4 @@
-from app.tools import calculator_tool, file_analyzer_tool
+from app.tools import calculator_tool, file_analyzer_tool, document_qa_tool
 from data.json_fallback import fetch_context
 from llm.client import chat_completion
 
@@ -43,6 +43,8 @@ def decide_tool(query: str):
     return "none"
 
 
+from app.tools import calculator_tool, file_analyzer_tool, document_qa_tool
+
 def answer_query(query, model_choice="Llama"):
 
     # 🔍 Extract latest question
@@ -51,13 +53,21 @@ def answer_query(query, model_choice="Llama"):
     else:
         latest_question = query.strip()
 
+    # 🔥 FILE HANDLING (VERY IMPORTANT)
+    if len(query) > 1000:   # means file content is passed
+
+        # 👉 If user asked a question → Q&A
+        if "?" in latest_question:
+            return document_qa_tool(latest_question, query, model_choice)
+
+        # 👉 Otherwise → summary
+        return file_analyzer_tool(query, model_choice)
+
+    # 🔧 TOOL DECISION (normal queries)
     tool = decide_tool_llm(latest_question, model_choice)
 
     if tool == "calculator":
         return calculator_tool(latest_question)
-
-    elif tool == "file":
-        return file_analyzer_tool(latest_question, model_choice)
 
     # 🔍 RAG context
     context = fetch_context(latest_question)
@@ -84,13 +94,9 @@ Context (if available):
 Answer:
 """
 
-    # 💬 Messages
     messages = [
         {"role": "system", "content": "You are a helpful AI assistant."},
         {"role": "user", "content": final_prompt}
     ]
 
-    # 🤖 LLM response
-    response = chat_completion(messages, model_choice)
-
-    return response
+    return chat_completion(messages, model_choice)
