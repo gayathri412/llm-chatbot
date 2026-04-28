@@ -63,7 +63,6 @@ Combine the following summaries into one clear final summary:
 
 from llm.client import chat_completion
 
-
 def document_qa_tool(question: str, text: str, model_choice="Llama"):
 
     # 🔪 Chunk text
@@ -78,14 +77,12 @@ def document_qa_tool(question: str, text: str, model_choice="Llama"):
         prompt = f"""
 You are an AI assistant answering questions from a document.
 
-STRICT RULES:
-- Answer the question precisely
-- Give Extra information 
-- Summarize the whole document
-- add extra information Like examples, Advantages, Disadvantages, Methods used 
-- Add Source where the answer came from 
-- Make annswers conversational 
-- even ask if Question and and Answers are Required
+RULES:
+- Answer the question clearly and accurately
+- Use relevant information from the context
+- Provide a slightly detailed answer (4–6 lines)
+- Do NOT summarize the entire document
+- Stay focused on the question
 
 Context:
 {chunk}
@@ -106,15 +103,13 @@ Answer:
 
     # 🔥 Combine answers
     final_prompt = f"""
-Combine the following answers into precise answer and understandable.
+Combine the following answers into ONE clear and well-structured answer.
 
-STRICT RULES:
-- Maximum More knowlegde
-- add extra details
-- Focus only on answering the question
-- Add Source where the answer came from 
-- Make annswers conversational 
-- even ask if Question and and Answers are Required
+RULES:
+- 5–8 lines
+- Include key details
+- Do NOT repeat information
+- Stay focused on the question
 
 Answers:
 {answers}
@@ -123,7 +118,7 @@ Final Answer:
 """
 
     messages = [
-        {"role": "system", "content": "You combine answers precisely."},
+        {"role": "system", "content": "You combine answers clearly."},
         {"role": "user", "content": final_prompt}
     ]
 
