@@ -10,16 +10,14 @@ def decide_tool_llm(query, model_choice):
 You are an AI assistant that selects tools.
 
 Available tools:
-1. calculator → for math calculations
-2. file → for analyzing documents
-3. none → for normal questions
+1. calculator
+2. file
+3. none
 
 Question: {query}
 
-Reply ONLY with:
-calculator
-file
-none
+Reply ONLY with one word:
+calculator OR file OR none
 """
 
     messages = [
@@ -30,15 +28,23 @@ none
     try:
         decision = chat_completion(messages, model_choice)
 
-        if not decision:
+        # ✅ safety checks
+        if not decision or not isinstance(decision, str):
             return "none"
 
         decision = decision.strip().lower()
+
+        # sometimes model returns sentence → take first word
         decision = decision.split()[0]
+
+        # ✅ enforce valid outputs
+        if decision not in ["calculator", "file", "none"]:
+            return "none"
 
         return decision
 
-    except Exception:
+    except Exception as e:
+        print("Tool decision error:", e)
         return "none"
 
 
