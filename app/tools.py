@@ -63,25 +63,24 @@ Combine the following summaries into one clear final summary:
 
 from llm.client import chat_completion
 
+
 def document_qa_tool(question: str, text: str, model_choice="Llama"):
 
-    # 🔪 Chunk text
     chunk_size = 800
     chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
     answers = []
 
-    # 🔍 Process chunks
-    for chunk in chunks[:2]:  # limit to avoid token overload
+    for chunk in chunks[:2]:
 
         prompt = f"""
 You are an AI assistant answering questions from a document.
 
 RULES:
-- Answer the question clearly and accurately
-- Use relevant information from the context
-- Provide a slightly detailed answer (4–6 lines)
-- Do NOT summarize the entire document
+- Give a detailed explanation (8–12 lines)
+- Explain concepts clearly
+- Include important details, methods, and examples if relevant
+- Do NOT restrict to short answers
 - Stay focused on the question
 
 Context:
@@ -94,7 +93,7 @@ Answer:
 """
 
         messages = [
-            {"role": "system", "content": "You answer questions from documents."},
+            {"role": "system", "content": "You are a helpful and detailed AI assistant."},
             {"role": "user", "content": prompt}
         ]
 
@@ -103,13 +102,13 @@ Answer:
 
     # 🔥 Combine answers
     final_prompt = f"""
-Combine the following answers into ONE clear and well-structured answer.
+Combine the following answers into ONE detailed and complete explanation.
 
 RULES:
-- 5–8 lines
-- Include key details
-- Do NOT repeat information
-- Stay focused on the question
+- Provide a full explanation (10–15 lines)
+- Include all key points
+- Avoid repetition
+- Make it easy to understand
 
 Answers:
 {answers}
@@ -118,10 +117,13 @@ Final Answer:
 """
 
     messages = [
-        {"role": "system", "content": "You combine answers clearly."},
+        {"role": "system", "content": "You combine answers into a complete explanation."},
         {"role": "user", "content": final_prompt}
     ]
 
     final_response = chat_completion(messages, model_choice)
+
+    # ✅ Add follow-up message
+    final_response += "\n\n👉 What more can I help you with?"
 
     return final_response
