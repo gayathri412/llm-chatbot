@@ -57,12 +57,11 @@ def answer_query(query, model_choice="Llama"):
     if len(query) > 1000:   # means file content is passed
 
         # 👉 If user asked a question → Q&A
-        if "?" in latest_question:
-            return document_qa_tool(latest_question, query, model_choice)
-
-        # 👉 Otherwise → summary
-        return file_analyzer_tool(query, model_choice)
-
+       question_words = ["what", "why", "how", "explain", "describe", "tell", "give", "list"]
+       if any(word in latest_question.lower() for word in question_words):
+              return document_qa_tool(latest_question, query, model_choice)
+       
+       return file_analyzer_tool(query, model_choice)
     # 🔧 TOOL DECISION (normal queries)
     tool = decide_tool_llm(latest_question, model_choice)
 
