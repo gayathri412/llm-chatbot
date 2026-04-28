@@ -1,6 +1,6 @@
 from llm.client import chat_completion
 
-def chunk_text(text, chunk_size=1500):
+def chunk_text(text, chunk_size=800):
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
 
@@ -9,7 +9,7 @@ def file_analyzer_tool(text: str, model_choice="Llama"):
     chunks = chunk_text(text)
     summaries = []
 
-    for chunk in chunks[:3]:  # limit to avoid overload
+    for chunk in chunks[:2]:  # limit to avoid overload
         prompt = f"""
 Summarize this part of a document:
 

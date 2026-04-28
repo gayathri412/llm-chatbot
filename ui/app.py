@@ -102,7 +102,9 @@ if page == "Chat":
             with pdfplumber.open(uploaded_file) as pdf:
                 for page in pdf.pages:
                     file_text += page.extract_text() or ""
-
+        
+        file_text = file_text[:5000]
+        
         st.success("File uploaded successfully ✅")
 
     # ---------- HOME SCREEN ----------
