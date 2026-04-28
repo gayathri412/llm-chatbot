@@ -1,6 +1,8 @@
 import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.context import fetch_context
+from app.utils import create_pdf
+    
 
 import streamlit as st
 from app.orchestrator import answer_query
@@ -124,8 +126,7 @@ if page == "Chat":
         st.chat_message("user").write(q)
         st.chat_message("assistant").write(r)
 
-    from app.utils import create_pdf
-    
+   
     pdf_file = create_pdf(response)
 
     with open(pdf_file, "rb") as f:
