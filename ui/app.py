@@ -394,6 +394,7 @@ elif page == "Images":
 
     load_dotenv()
 
+    OCR_AVAILABLE = False
     try:
         import pytesseract
         import platform
