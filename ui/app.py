@@ -392,10 +392,9 @@ elif page == "Images":
     st.title("🖼️ Image AI Studio")
 
     # ── imports ──────────────────────────────────────────────
-    import io, math, requests, os, base64
+    import io, math, os
     from PIL import Image, ImageEnhance, ImageDraw
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
+    from huggingface_hub import InferenceClient
     from dotenv import load_dotenv
 
     load_dotenv()
@@ -407,58 +406,26 @@ elif page == "Images":
     except Exception:
         OCR_AVAILABLE = False
 
-    styles = getSampleStyleSheet()
-
     # ── Hugging Face config ───────────────────────────────────
     HF_TOKEN = st.secrets.get("HF_TOKEN") or os.environ.get("HF_TOKEN")
 
     HF_MODELS = {
-        "⚡ SD v1.5  (Fastest)":          "runwayml/stable-diffusion-v1-5",
-        "⚖️ SD v2.1  (Balanced)":         "stabilityai/stable-diffusion-2-1",
-        "🎨 Dreamlike Photoreal (Vivid)":  "dreamlike-art/dreamlike-photoreal-2.0",
+        "⚡ FLUX Schnell (Fastest)":    "black-forest-labs/FLUX.1-schnell",
+        "🏆 FLUX Dev    (Best Quality)": "black-forest-labs/FLUX.1-dev",
+        "🎨 SD v2       (Classic)":      "stabilityai/stable-diffusion-2",
     }
 
-    # ── helper: call HF inference API ────────────────────────
-    def generate_image_hf(prompt: str, model_id: str, width: int = 512, height: int = 512) -> Image.Image:
-        url = f"https://api-inference.huggingface.co/models/{model_id}"
-        headers = {
-            "Authorization":  f"Bearer {HF_TOKEN}",
-            "Content-Type":   "application/json",
-            "X-Wait-For-Model": "true",
-        }
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "width":                width,
-                "height":               height,
-                "num_inference_steps":  30,
-                "guidance_scale":       7.5,
-            }
-        }
-        response = requests.post(url, headers=headers, json=payload, timeout=120)
-
-        if response.status_code == 503:
-            raise Exception("Model is loading, please wait 20–30 seconds and try again.")
-        if response.status_code == 404:
-            raise Exception(f"Model not found or not available on free tier: {model_id}")
-        if response.status_code != 200:
-            raise Exception(f"API error {response.status_code}: {response.text}")
-
-        return Image.open(io.BytesIO(response.content)).convert("RGB")
+    # ── helper: generate image via HF InferenceClient ────────
+    def generate_image_hf(prompt: str, model_id: str) -> Image.Image:
+        client = InferenceClient(token=HF_TOKEN)
+        image  = client.text_to_image(prompt=prompt, model=model_id)
+        return image  # returns PIL Image directly
 
     # ── helper: PIL → PNG bytes ───────────────────────────────
     def pil_to_bytes(img: Image.Image) -> bytes:
         buf = io.BytesIO()
-        img.save(buf, format="PNG")
+        img.convert("RGB").save(buf, format="PNG")
         return buf.getvalue()
-
-    # ── helper: PIL → square PNG bytes ───────────────────────
-    def to_square_png_bytes(img: Image.Image, size: int = 512) -> io.BytesIO:
-        img = img.convert("RGBA").resize((size, size))
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
-        return buf
 
     # ── helper: dynamic image grid with download buttons ─────
     def render_image_grid(images: list, captions: list = None):
@@ -505,24 +472,19 @@ elif page == "Images":
         model_label = st.selectbox(
             "🤖 Choose Model",
             list(HF_MODELS.keys()),
-            help="SD v1.5 = fastest | SD v2.1 = balanced | Dreamlike = vivid/photorealistic"
+            help="FLUX Schnell = fastest | FLUX Dev = best quality | SD v2 = classic"
         )
         model_id = HF_MODELS[model_label]
-        st.caption(f"Model ID: `{model_id}`")
+        st.caption(f"Model: `{model_id}`")
 
         prompt     = st.text_area("📝 Prompt", placeholder="A futuristic city at sunset, oil painting style…")
         neg_prompt = st.text_input("🚫 Negative Prompt (optional)", placeholder="blurry, bad quality, ugly…")
 
-        col_a, col_b, col_c = st.columns(3)
+        col_a, col_b = st.columns(2)
         with col_a:
             num_images = st.slider("Number of images", 1, 4, 1, key="gen_n")
         with col_b:
-            size_choice = st.selectbox("Size", ["512×512", "768×768", "512×768"], key="gen_size")
-        with col_c:
-            steps = st.slider("Quality steps", 10, 50, 30, key="gen_steps",
-                              help="More steps = better quality but slower")
-
-        w, h = map(int, size_choice.replace("×", "x").split("x"))
+            st.info("💡 Image size is auto-selected by the model")
 
         if st.button("🚀 Generate", key="btn_gen"):
             if not prompt.strip():
@@ -536,14 +498,14 @@ elif page == "Images":
                 for i in range(num_images):
                     progress.progress(
                         int((i / num_images) * 100),
-                        text=f"Generating image {i+1} of {num_images}…"
+                        text=f"Generating image {i+1} of {num_images}… (may take 20–40s)"
                     )
                     try:
                         full_prompt = prompt
                         if neg_prompt.strip():
-                            full_prompt += f" | negative: {neg_prompt}"
+                            full_prompt += f", not {neg_prompt}"
 
-                        img = generate_image_hf(full_prompt, model_id, w, h)
+                        img = generate_image_hf(full_prompt, model_id)
                         generated.append(img)
 
                     except Exception as e:
@@ -567,16 +529,12 @@ elif page == "Images":
         var_model_id    = HF_MODELS[var_model_label]
 
         var_file   = st.file_uploader("Upload source image", type=["png", "jpg", "jpeg"], key="var_up")
-        var_prompt = st.text_input("📝 Describe the image (used as base prompt)",
-                                   placeholder="A portrait of a woman in blue…", key="var_prompt")
-
-        col_v1, col_v2 = st.columns(2)
-        with col_v1:
-            var_n    = st.slider("Number of variations", 1, 4, 2, key="var_n")
-        with col_v2:
-            var_size = st.selectbox("Size", ["512×512", "768×768"], key="var_size")
-
-        vw, vh = map(int, var_size.replace("×", "x").split("x"))
+        var_prompt = st.text_input(
+            "📝 Describe the image (used as base prompt)",
+            placeholder="A portrait of a woman in blue…",
+            key="var_prompt"
+        )
+        var_n = st.slider("Number of variations", 1, 4, 2, key="var_n")
 
         if var_file:
             src_img = Image.open(var_file)
@@ -598,7 +556,7 @@ elif page == "Images":
                         )
                         try:
                             varied = f"{var_prompt}, variation {i+1}, different angle, different lighting"
-                            img    = generate_image_hf(varied, var_model_id, vw, vh)
+                            img    = generate_image_hf(varied, var_model_id)
                             variations.append(img)
                         except Exception as e:
                             st.error(f"Variation {i+1} failed: {e}")
@@ -621,16 +579,12 @@ elif page == "Images":
         edit_model_id    = HF_MODELS[edit_model_label]
 
         edit_file   = st.file_uploader("Upload image to edit", type=["png", "jpg", "jpeg"], key="edit_up")
-        edit_prompt = st.text_area("✏️ Edit prompt",
-                                   placeholder="Same scene but at night with neon lights…", key="edit_prompt")
-
-        col_e1, col_e2 = st.columns(2)
-        with col_e1:
-            edit_n    = st.slider("Number of outputs", 1, 4, 1, key="edit_n")
-        with col_e2:
-            edit_size = st.selectbox("Size", ["512×512", "768×768"], key="edit_size")
-
-        ew, eh = map(int, edit_size.replace("×", "x").split("x"))
+        edit_prompt = st.text_area(
+            "✏️ Edit prompt",
+            placeholder="Same scene but at night with neon lights…",
+            key="edit_prompt"
+        )
+        edit_n = st.slider("Number of outputs", 1, 4, 1, key="edit_n")
 
         if edit_file:
             src_img = Image.open(edit_file).convert("RGB")
@@ -651,7 +605,7 @@ elif page == "Images":
                             text=f"Generating edit {i+1} of {edit_n}…"
                         )
                         try:
-                            img = generate_image_hf(edit_prompt, edit_model_id, ew, eh)
+                            img = generate_image_hf(edit_prompt, edit_model_id)
                             edits.append(img)
                         except Exception as e:
                             st.error(f"Edit {i+1} failed: {e}")
@@ -688,7 +642,7 @@ elif page == "Images":
 
             st.download_button(
                 "⬇️ Download Original",
-                data=pil_to_bytes(image.convert("RGB")),
+                data=pil_to_bytes(image),
                 file_name="original.png",
                 mime="image/png",
                 key="dl_orig"
@@ -745,7 +699,7 @@ elif page == "Images":
 
             st.download_button(
                 "⬇️ Download Enhanced",
-                data=pil_to_bytes(enhanced.convert("RGB")),
+                data=pil_to_bytes(enhanced),
                 file_name="enhanced.png",
                 mime="image/png",
                 key="dl_enh"
