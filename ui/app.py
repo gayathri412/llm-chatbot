@@ -657,13 +657,11 @@ elif page == "Images":
                     try:
                         import google.generativeai as genai
                         import base64
-                        GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-                        genai.configure(api_key=GEMINI_API_KEY)
 
                         buf = io.BytesIO()
                         image.convert("RGB").save(buf, format="JPEG")
                         buf.seek(0)
-                        model_gemini = genai.GenerativeModel("gemini-2.0-flash")
+                        model_gemini = genai.GenerativeModel("gemini-1.5-flash")
                         response = model_gemini.generate_content([
                             "Analyze this image in detail. Provide: 1) Full description 2) Key objects and elements 3) Colors and mood 4) Possible meaning or use case 5) Any text visible in the image.",
                             {"mime_type": "image/jpeg", "data": buf.getvalue()}
