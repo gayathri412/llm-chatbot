@@ -694,6 +694,11 @@ elif page == "Images":
         if ocr_file:
             ocr_img = Image.open(ocr_file)
             st.image(ocr_img, width=300)
+            
+            import shutil, platform
+            st.write(f"OCR_AVAILABLE: {OCR_AVAILABLE}")
+            st.write(f"Tesseract binary: {shutil.which('tesseract')}")
+            st.write(f"Platform: {platform.system()}")
 
             if st.button("🔍 Extract Text", key="btn_ocr"):
                 if not OCR_AVAILABLE:
