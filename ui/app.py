@@ -653,13 +653,27 @@ elif page == "Images":
             st.write(f"**Mode:** {image.mode}")
 
             if st.button("🤖 Analyze Image", key="btn_analyze"):
-                with st.spinner("Analyzing…"):
-                    response = answer_query(
-                        "Describe this image, explain insights, and possible meaning.",
-                        model_choice
-                    )
-                st.write("### 🤖 AI Insight")
-                st.write(response)
+                with st.spinner("Analyzing with Gemini Vision…"):
+                    try:
+                        import google.generativeai as genai
+                        import base64
+                        GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+                        genai.configure(api_key=GEMINI_API_KEY)
+
+                        buf = io.BytesIO()
+                        image.convert("RGB").save(buf, format="JPEG")
+                        buf.seek(0)
+                        model_gemini = genai.GenerativeModel("gemini-1.5-flash")
+                        response = model_gemini.generate_content([
+                            "Analyze this image in detail. Provide: 1) Full description 2) Key objects and elements 3) Colors and mood 4) Possible meaning or use case 5) Any text visible in the image.",
+                            {"mime_type": "image/jpeg", "data": buf.getvalue()}
+                        ])
+
+                        st.write("### 🤖 Gemini Vision Analysis")
+                        st.write(response.text)
+                    except Exception as e:
+                        st.error(f"Gemini Vision failed: {e}")
+
 
             st.download_button(
                 "⬇️ Download Original",
