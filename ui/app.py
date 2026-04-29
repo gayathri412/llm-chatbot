@@ -3,7 +3,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from data.context import fetch_context
 import io, math, requests, base64
 from PIL import Image, ImageEnhance, ImageDraw
-from openai import OpenAI
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
