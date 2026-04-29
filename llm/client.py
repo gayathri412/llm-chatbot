@@ -22,7 +22,7 @@ def chat_completion(messages, model_choice="Llama"):
         # 🟢 GEMINI (with fallback to Llama)
         if model_choice == "Gemini":
             try:
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                model = genai.GenerativeModel("gemini-2.5-flash")
                 response = model.generate_content(user_input)
                 return response.text
             except Exception:
