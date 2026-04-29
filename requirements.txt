@@ -12,3 +12,4 @@ python-dotenv
 groq
 openai
 requests
+huggingface_hub
