@@ -413,30 +413,34 @@ elif page == "Images":
     HF_TOKEN = st.secrets.get("HF_TOKEN") or os.environ.get("HF_TOKEN")
 
     HF_MODELS = {
-        "⚡ SD v1.5  (Fastest)":        "runwayml/stable-diffusion-v1-5",
-        "⚖️ SD v2.1  (Balanced)":       "stabilityai/stable-diffusion-2-1",
-        "🏆 SDXL 1.0 (Best Quality)":   "stabilityai/stable-diffusion-xl-base-1.0",
+        "⚡ SD v1.5  (Fastest)":          "runwayml/stable-diffusion-v1-5",
+        "⚖️ SD v2.1  (Balanced)":         "stabilityai/stable-diffusion-2-1",
+        "🎨 Dreamlike Photoreal (Vivid)":  "dreamlike-art/dreamlike-photoreal-2.0",
     }
-
-    HF_API_URL = "https://api-inference.huggingface.co/models/{model}"
 
     # ── helper: call HF inference API ────────────────────────
     def generate_image_hf(prompt: str, model_id: str, width: int = 512, height: int = 512) -> Image.Image:
-        url     = HF_API_URL.format(model=model_id)
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+        url = f"https://api-inference.huggingface.co/models/{model_id}"
+        headers = {
+            "Authorization":  f"Bearer {HF_TOKEN}",
+            "Content-Type":   "application/json",
+            "X-Wait-For-Model": "true",
+        }
         payload = {
             "inputs": prompt,
             "parameters": {
-                "width":            width,
-                "height":           height,
-                "num_inference_steps": 30,
-                "guidance_scale":   7.5,
+                "width":                width,
+                "height":               height,
+                "num_inference_steps":  30,
+                "guidance_scale":       7.5,
             }
         }
         response = requests.post(url, headers=headers, json=payload, timeout=120)
 
         if response.status_code == 503:
             raise Exception("Model is loading, please wait 20–30 seconds and try again.")
+        if response.status_code == 404:
+            raise Exception(f"Model not found or not available on free tier: {model_id}")
         if response.status_code != 200:
             raise Exception(f"API error {response.status_code}: {response.text}")
 
@@ -498,11 +502,10 @@ elif page == "Images":
     with tab_gen:
         st.subheader("Generate Images from Text")
 
-        # ── model selector ────────────────────────────────────
         model_label = st.selectbox(
             "🤖 Choose Model",
             list(HF_MODELS.keys()),
-            help="SD v1.5 = fastest | SD v2.1 = balanced | SDXL = best quality"
+            help="SD v1.5 = fastest | SD v2.1 = balanced | Dreamlike = vivid/photorealistic"
         )
         model_id = HF_MODELS[model_label]
         st.caption(f"Model ID: `{model_id}`")
@@ -519,7 +522,6 @@ elif page == "Images":
             steps = st.slider("Quality steps", 10, 50, 30, key="gen_steps",
                               help="More steps = better quality but slower")
 
-        # parse size
         w, h = map(int, size_choice.replace("×", "x").split("x"))
 
         if st.button("🚀 Generate", key="btn_gen"):
@@ -564,12 +566,13 @@ elif page == "Images":
         var_model_label = st.selectbox("🤖 Model", list(HF_MODELS.keys()), key="var_model")
         var_model_id    = HF_MODELS[var_model_label]
 
-        var_file = st.file_uploader("Upload source image", type=["png", "jpg", "jpeg"], key="var_up")
-        var_prompt = st.text_input("📝 Describe the image (used as base prompt)", placeholder="A portrait of a woman in blue…", key="var_prompt")
+        var_file   = st.file_uploader("Upload source image", type=["png", "jpg", "jpeg"], key="var_up")
+        var_prompt = st.text_input("📝 Describe the image (used as base prompt)",
+                                   placeholder="A portrait of a woman in blue…", key="var_prompt")
 
         col_v1, col_v2 = st.columns(2)
         with col_v1:
-            var_n = st.slider("Number of variations", 1, 4, 2, key="var_n")
+            var_n    = st.slider("Number of variations", 1, 4, 2, key="var_n")
         with col_v2:
             var_size = st.selectbox("Size", ["512×512", "768×768"], key="var_size")
 
@@ -594,7 +597,6 @@ elif page == "Images":
                             text=f"Generating variation {i+1} of {var_n}…"
                         )
                         try:
-                            # slightly vary prompt each time for diversity
                             varied = f"{var_prompt}, variation {i+1}, different angle, different lighting"
                             img    = generate_image_hf(varied, var_model_id, vw, vh)
                             variations.append(img)
@@ -619,7 +621,8 @@ elif page == "Images":
         edit_model_id    = HF_MODELS[edit_model_label]
 
         edit_file   = st.file_uploader("Upload image to edit", type=["png", "jpg", "jpeg"], key="edit_up")
-        edit_prompt = st.text_area("✏️ Edit prompt", placeholder="Same scene but at night with neon lights…", key="edit_prompt")
+        edit_prompt = st.text_area("✏️ Edit prompt",
+                                   placeholder="Same scene but at night with neon lights…", key="edit_prompt")
 
         col_e1, col_e2 = st.columns(2)
         with col_e1:
@@ -747,9 +750,6 @@ elif page == "Images":
                 mime="image/png",
                 key="dl_enh"
             )
-
-
-
    
 # =========================================
 # 📱 APPS PAGE
