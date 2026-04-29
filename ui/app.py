@@ -1,9 +1,18 @@
 import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.context import fetch_context
+import io, math, requests, base64
+from PIL import Image, ImageEnhance, ImageDraw
+from openai import OpenAI
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
 import streamlit as st
 from app.orchestrator import answer_query
+
+
+api_key = st.secrets.get("OPENAI_API_KEY")
+openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 st.set_page_config(page_title="AI Assistant", page_icon="🤖", layout="wide")
 
@@ -395,11 +404,7 @@ elif page == "Images":
     st.title("🖼️ Image AI Studio")
 
     # ── imports ──────────────────────────────────────────────
-    import io, math, requests, base64
-    from PIL import Image, ImageEnhance, ImageDraw
-    from openai import OpenAI
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
+    
 
     try:
         import pytesseract
@@ -411,7 +416,7 @@ elif page == "Images":
     # ── OpenAI client ─────────────────────────────────────────
     from dotenv import load_dotenv
     load_dotenv()
-    openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    
 
     styles = getSampleStyleSheet()
 
