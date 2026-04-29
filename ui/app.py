@@ -493,6 +493,7 @@ elif page == "Images":
         with col_c:
             use_random_seed = st.checkbox("Random seed", value=True, key="gen_seed")
 
+        st.info("💡 Tip: Use 1 image at a time to avoid rate limits on the free tier.")
         w, h = map(int, size_choice.replace("×", "x").split("x"))
 
         if st.button("🚀 Generate", key="btn_gen"):
@@ -513,8 +514,10 @@ elif page == "Images":
                             full_prompt += f", avoid {neg_prompt}"
 
                         seed = None if use_random_seed else 42 + i
-                        img  = generate_image(full_prompt, model_id, w, h, seed)
+                        img = generate_image(full_prompt, model_id, w, h, seed)
                         generated.append(img)
+                        import time
+                        time.sleep(3)
 
                     except Exception as e:
                         st.error(f"Image {i+1} failed: {e}")
