@@ -469,13 +469,16 @@ elif page == "Images":
     with tab_gen:
         st.subheader("Generate Images from Text")
 
-        model_label = st.selectbox(
-            "🤖 Choose Model",
-            list(HF_MODELS.keys()),
-            help="FLUX Schnell = fastest | FLUX Dev = best quality | SD v2 = classic"
-        )
-        model_id = HF_MODELS[model_label]
-        st.caption(f"Model: `{model_id}`")
+        model_id = st.selectbox(
+          "🤖 Choose Model",
+          [
+              "black-forest-labs/FLUX.1-schnell",
+              "black-forest-labs/FLUX.1-dev",
+              "stabilityai/stable-diffusion-2-1",
+          ],
+           help="FLUX Schnell = fastest | FLUX Dev = best quality | SD 2.1 = classic"
+       )
+        st.caption(f"Model: `{model_id}`") 
 
         prompt     = st.text_area("📝 Prompt", placeholder="A futuristic city at sunset, oil painting style…")
         neg_prompt = st.text_input("🚫 Negative Prompt (optional)", placeholder="blurry, bad quality, ugly…")
@@ -515,7 +518,7 @@ elif page == "Images":
 
                 if generated:
                     st.success(f"✅ {len(generated)} image(s) generated!")
-                    captions = [f"#{i+1} • {model_label.split('(')[0].strip()}" for i in range(len(generated))]
+                    captions = [f"#{i+1} • {model_id.split('/')[1]}" for i in range(len(generated))]
                     render_image_grid(generated, captions)
 
     # ═══════════════════════════════════════════════════════════
