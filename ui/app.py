@@ -400,8 +400,11 @@ elif page == "Images":
         import platform
         if platform.system() == "Windows":
             pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-            OCR_AVAILABLE = True
-    except Exception:
+        else:
+            pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+        OCR_AVAILABLE = True   
+    except Exception as e:
+        st.warning(f"OCR import error: {e}")
         OCR_AVAILABLE = False
 
     # ── Pollinations.ai config (100% free, no API key) ───────
