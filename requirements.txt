@@ -10,3 +10,5 @@ pytesseract
 google-generativeai
 python-dotenv
 groq
+openai
+requests
