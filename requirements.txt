@@ -12,3 +12,4 @@ python-dotenv
 groq
 requests
 huggingface_hub
+tesseract-ocr
