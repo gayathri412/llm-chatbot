@@ -10,7 +10,5 @@ numpy
 matplotlib
 huggingface_hub>=0.20.0
 groq
-google-generativeai==0.7.2
-protobuf>=5.26.0
-googleapis-common-protos==1.63.2
+google-generativeai>=0.8.0
 pytesseract
