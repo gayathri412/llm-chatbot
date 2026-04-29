@@ -380,132 +380,359 @@ elif page == "Charts":
 # 🖼️ IMAGES PAGE
 # =========================================
 
+# =========================================
+# 🖼️ IMAGES PAGE  — drop-in replacement
+# =========================================
+# HOW TO USE:
+#   1. pip install openai pillow pytesseract reportlab
+#   2. Add your key to .streamlit/secrets.toml:
+#        OPENAI_API_KEY = "sk-..."
+#   3. Replace the entire  `elif page == "Images":` block
+#      in your app.py with this code.
+# =========================================
+
 elif page == "Images":
-    st.title("🖼️ Image AI Module")
+    st.title("🖼️ Image AI Studio")
 
-    from PIL import Image, ImageEnhance
-    import pytesseract
-    import io
-    
-
-try:
-    import pytesseract
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-except:
-    st.warning("OCR not supported in this environment")
-
+    # ── imports ──────────────────────────────────────────────
+    import io, math, requests, base64
+    from PIL import Image, ImageEnhance, ImageDraw
+    from openai import OpenAI
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet
 
+    try:
+        import pytesseract
+        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        OCR_AVAILABLE = True
+    except Exception:
+        OCR_AVAILABLE = False
+
+    # ── OpenAI client ─────────────────────────────────────────
+    from dotenv import load_dotenv
+    load_dotenv()
+    openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
     styles = getSampleStyleSheet()
 
-    file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
+    # ── helper: download image URL → PIL ──────────────────────
+    def url_to_pil(url: str) -> Image.Image:
+        resp = requests.get(url, timeout=30)
+        return Image.open(io.BytesIO(resp.content)).convert("RGBA")
 
-    if file:
-        image = Image.open(file)
+    # ── helper: PIL → PNG bytes ────────────────────────────────
+    def pil_to_bytes(img: Image.Image) -> bytes:
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
 
-        # ---------- TABS ----------
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "📷 Preview",
-            "🧾 OCR",
-            "🤖 Analysis",
-            "✨ Enhance"
-        ])
+    # ── helper: PIL → square PNG bytes (for DALL-E 2 API) ──────
+    def to_square_png_bytes(img: Image.Image, size: int = 1024) -> bytes:
+        img = img.convert("RGBA").resize((size, size))
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        return buf
 
-        # =====================================================
-        # 📷 PREVIEW
-        # =====================================================
-        with tab1:
-            st.image(image, caption="Uploaded Image")
-            st.write(f"Size: {image.size}")
-            st.write(f"Mode: {image.mode}")
+    # ── helper: render dynamic image grid ─────────────────────
+    def render_image_grid(images: list, captions: list = None):
+        """Render a list of PIL images in a dynamic grid with download buttons."""
+        n = len(images)
+        if n == 0:
+            return
+        cols_count = min(n, 4)          # max 4 per row
+        rows = math.ceil(n / cols_count)
 
-        # =====================================================
-        # 🧾 OCR (TEXT EXTRACTION)
-        # =====================================================
-        with tab2:
-            if st.button("Extract Text"):
-                with st.spinner("Reading text..."):
-                    text = pytesseract.image_to_string(image)
-
-                st.text_area("Extracted Text", text, height=200)
-
-        # =====================================================
-        # 🤖 AI ANALYSIS
-        # =====================================================
-        with tab3:
-            if st.button("Analyze Image"):
-                with st.spinner("Analyzing..."):
-                    response = answer_query(
-                        "Describe this image, explain insights, and possible meaning",
-                        model_choice
+        for row in range(rows):
+            cols = st.columns(cols_count)
+            for col_idx in range(cols_count):
+                img_idx = row * cols_count + col_idx
+                if img_idx >= n:
+                    break
+                img = images[img_idx]
+                caption = captions[img_idx] if captions else f"Image {img_idx + 1}"
+                with cols[col_idx]:
+                    st.image(img, caption=caption, use_column_width=True)
+                    st.download_button(
+                        label="⬇️ Download",
+                        data=pil_to_bytes(img),
+                        file_name=f"dalle_{img_idx+1}.png",
+                        mime="image/png",
+                        key=f"dl_{img_idx}_{caption[:10]}"
                     )
 
+    # ── TABS ──────────────────────────────────────────────────
+    tab_gen, tab_var, tab_edit, tab_preview, tab_ocr, tab_enhance = st.tabs([
+        "🎨 Generate",
+        "🔁 Variations",
+        "✏️ Inpaint / Edit",
+        "📷 Preview",
+        "🧾 OCR",
+        "✨ Enhance",
+    ])
+
+    # ═══════════════════════════════════════════════════════════
+    # 🎨 TAB 1 — GENERATE (text → image matrix)
+    # ═══════════════════════════════════════════════════════════
+    with tab_gen:
+        st.subheader("Generate Images from Text")
+
+        prompt = st.text_area("📝 Prompt", placeholder="A futuristic city at sunset, oil painting style…")
+
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            gen_model = st.selectbox("Model", ["dall-e-3", "dall-e-2"], key="gen_model")
+        with col_b:
+            # DALL-E 3 supports only n=1; DALL-E 2 supports 1-4
+            max_n = 1 if gen_model == "dall-e-3" else 4
+            num_images = st.slider("Number of images", 1, max_n, 1, key="gen_n")
+        with col_c:
+            size_options = {
+                "dall-e-3": ["1024x1024", "1792x1024", "1024x1792"],
+                "dall-e-2": ["256x256", "512x512", "1024x1024"],
+            }
+            size = st.selectbox("Size", size_options[gen_model], key="gen_size")
+
+        if gen_model == "dall-e-3":
+            quality = st.radio("Quality", ["standard", "hd"], horizontal=True)
+            style   = st.radio("Style",   ["vivid", "natural"], horizontal=True)
+
+        if st.button("🚀 Generate", key="btn_gen"):
+            if not prompt.strip():
+                st.warning("Please enter a prompt.")
+            else:
+                with st.spinner(f"Generating {num_images} image(s)…"):
+                    try:
+                        kwargs = dict(
+                            model=gen_model,
+                            prompt=prompt,
+                            n=num_images,
+                            size=size,
+                            response_format="url",
+                        )
+                        if gen_model == "dall-e-3":
+                            kwargs["quality"] = quality
+                            kwargs["style"]   = style
+
+                        response = openai_client.images.generate(**kwargs)
+
+                        images   = [url_to_pil(d.url) for d in response.data]
+                        captions = [f"#{i+1} — {size}" for i in range(len(images))]
+
+                        st.success(f"✅ {len(images)} image(s) generated!")
+                        render_image_grid(images, captions)
+
+                        # store revised prompt (DALL-E 3 rewrites prompts)
+                        if gen_model == "dall-e-3" and response.data[0].revised_prompt:
+                            st.info(f"📝 Revised prompt: {response.data[0].revised_prompt}")
+
+                    except Exception as e:
+                        st.error(f"Generation failed: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # 🔁 TAB 2 — VARIATIONS  (DALL-E 2 only)
+    # ═══════════════════════════════════════════════════════════
+    with tab_var:
+        st.subheader("Image Variations  *(DALL-E 2)*")
+        st.caption("Upload a square PNG (<4 MB) and generate similar versions.")
+
+        var_file = st.file_uploader("Upload source image", type=["png", "jpg", "jpeg"], key="var_up")
+
+        col_v1, col_v2 = st.columns(2)
+        with col_v1:
+            var_n    = st.slider("Number of variations", 1, 4, 2, key="var_n")
+        with col_v2:
+            var_size = st.selectbox("Size", ["256x256", "512x512", "1024x1024"], key="var_size")
+
+        if var_file:
+            src_img = Image.open(var_file)
+            st.image(src_img, caption="Source image", width=300)
+
+            if st.button("🔁 Generate Variations", key="btn_var"):
+                with st.spinner("Creating variations…"):
+                    try:
+                        px = int(var_size.split("x")[0])
+                        png_buf = to_square_png_bytes(src_img, px)
+
+                        response = openai_client.images.create_variation(
+                            image=png_buf,
+                            n=var_n,
+                            size=var_size,
+                            response_format="url",
+                        )
+
+                        images   = [url_to_pil(d.url) for d in response.data]
+                        captions = [f"Variation {i+1}" for i in range(len(images))]
+
+                        st.success(f"✅ {len(images)} variation(s) ready!")
+                        render_image_grid(images, captions)
+
+                    except Exception as e:
+                        st.error(f"Variation failed: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # ✏️ TAB 3 — INPAINT / EDIT  (DALL-E 2 only)
+    # ═══════════════════════════════════════════════════════════
+    with tab_edit:
+        st.subheader("Inpainting / Edit  *(DALL-E 2)*")
+        st.caption(
+            "Upload your image + a mask PNG (transparent area = region to regenerate). "
+            "Or use the auto-mask option to blank the bottom half."
+        )
+
+        edit_file = st.file_uploader("Upload image to edit", type=["png", "jpg", "jpeg"], key="edit_up")
+        mask_file = st.file_uploader("Upload mask (optional)", type=["png"], key="mask_up")
+
+        edit_prompt = st.text_area("✏️ Edit prompt", placeholder="Replace background with a snowy mountain landscape…", key="edit_prompt")
+
+        col_e1, col_e2 = st.columns(2)
+        with col_e1:
+            edit_n    = st.slider("Number of outputs", 1, 4, 1, key="edit_n")
+        with col_e2:
+            edit_size = st.selectbox("Size", ["256x256", "512x512", "1024x1024"], key="edit_size")
+
+        auto_mask = st.checkbox("Auto-mask bottom half (if no mask uploaded)", value=True)
+
+        if edit_file:
+            src_img = Image.open(edit_file).convert("RGBA")
+            st.image(src_img, caption="Image to edit", width=300)
+
+            if st.button("✏️ Apply Edit", key="btn_edit"):
+                if not edit_prompt.strip():
+                    st.warning("Please enter an edit prompt.")
+                else:
+                    with st.spinner("Editing image…"):
+                        try:
+                            px = int(edit_size.split("x")[0])
+                            img_buf = to_square_png_bytes(src_img, px)
+
+                            # Build mask
+                            if mask_file:
+                                mask_img = Image.open(mask_file).convert("RGBA").resize((px, px))
+                            elif auto_mask:
+                                mask_img = Image.new("RGBA", (px, px), (255, 255, 255, 255))
+                                draw = ImageDraw.Draw(mask_img)
+                                draw.rectangle([0, px // 2, px, px], fill=(0, 0, 0, 0))
+                            else:
+                                mask_img = None
+
+                            mask_buf = to_square_png_bytes(mask_img, px) if mask_img else None
+
+                            kwargs = dict(
+                                image=img_buf,
+                                prompt=edit_prompt,
+                                n=edit_n,
+                                size=edit_size,
+                                response_format="url",
+                            )
+                            if mask_buf:
+                                kwargs["mask"] = mask_buf
+
+                            response = openai_client.images.edit(**kwargs)
+
+                            images   = [url_to_pil(d.url) for d in response.data]
+                            captions = [f"Edit {i+1}" for i in range(len(images))]
+
+                            st.success(f"✅ {len(images)} edited image(s) ready!")
+
+                            # show side-by-side original vs edits
+                            st.write("**Original → Edits**")
+                            all_imgs     = [src_img.convert("RGB")] + images
+                            all_captions = ["Original"] + captions
+                            render_image_grid(all_imgs, all_captions)
+
+                        except Exception as e:
+                            st.error(f"Edit failed: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # 📷 TAB 4 — PREVIEW uploaded image
+    # ═══════════════════════════════════════════════════════════
+    with tab_preview:
+        st.subheader("Preview Uploaded Image")
+        prev_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="prev_up")
+
+        if prev_file:
+            image = Image.open(prev_file)
+            st.image(image, caption="Uploaded Image")
+            st.write(f"**Size:** {image.size[0]} × {image.size[1]} px")
+            st.write(f"**Mode:** {image.mode}")
+
+            # AI Analysis
+            if st.button("🤖 Analyze Image", key="btn_analyze"):
+                with st.spinner("Analyzing…"):
+                    response = answer_query(
+                        "Describe this image, explain insights, and possible meaning.",
+                        model_choice
+                    )
                 st.write("### 🤖 AI Insight")
                 st.write(response)
 
-        # =====================================================
-        # ✨ ENHANCEMENT
-        # =====================================================
-        with tab4:
-            brightness = st.slider("Brightness", 0.5, 2.0, 1.0)
-            contrast = st.slider("Contrast", 0.5, 2.0, 1.0)
-
-            enhanced = ImageEnhance.Brightness(image).enhance(brightness)
-            enhanced = ImageEnhance.Contrast(enhanced).enhance(contrast)
-
-            st.image(enhanced, caption="Enhanced Image")
-
-        # =====================================================
-        # 📄 PDF REPORT DOWNLOAD
-        # =====================================================
-        if st.button("📥 Download Image Report"):
-            report = "Image Analysis Report\n\n"
-
-            try:
-                text = pytesseract.image_to_string(image)
-                report += f"OCR Text:\n{text}\n\n"
-            except:
-                report += "OCR failed\n\n"
-
-            response = answer_query(
-                "Analyze this image and summarize findings",
-                model_choice
+            # Download original
+            st.download_button(
+                "⬇️ Download Original",
+                data=pil_to_bytes(image.convert("RGB")),
+                file_name="original.png",
+                mime="image/png",
+                key="dl_orig"
             )
 
-            report += f"AI Analysis:\n{response}"
+    # ═══════════════════════════════════════════════════════════
+    # 🧾 TAB 5 — OCR
+    # ═══════════════════════════════════════════════════════════
+    with tab_ocr:
+        st.subheader("Extract Text from Image (OCR)")
+        ocr_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="ocr_up")
 
-            buffer = io.BytesIO()
-            doc = SimpleDocTemplate(buffer)
+        if ocr_file:
+            ocr_img = Image.open(ocr_file)
+            st.image(ocr_img, width=300)
 
-            content = [
-                Paragraph("Image Report", styles["Title"]),
-                Spacer(1, 12),
-                Paragraph(report, styles["Normal"])
-            ]
+            if st.button("🔍 Extract Text", key="btn_ocr"):
+                if not OCR_AVAILABLE:
+                    st.error("Tesseract OCR is not installed or not found.")
+                else:
+                    with st.spinner("Reading text…"):
+                        text = pytesseract.image_to_string(ocr_img)
+                    st.text_area("Extracted Text", text, height=200)
+                    st.download_button(
+                        "⬇️ Download Text",
+                        data=text.encode(),
+                        file_name="ocr_output.txt",
+                        mime="text/plain",
+                        key="dl_ocr"
+                    )
 
-            doc.build(content)
+    # ═══════════════════════════════════════════════════════════
+    # ✨ TAB 6 — ENHANCE
+    # ═══════════════════════════════════════════════════════════
+    with tab_enhance:
+        st.subheader("Enhance Image")
+        enh_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="enh_up")
+
+        if enh_file:
+            enh_img = Image.open(enh_file)
+
+            brightness = st.slider("Brightness", 0.5, 2.0, 1.0, key="brightness")
+            contrast   = st.slider("Contrast",   0.5, 2.0, 1.0, key="contrast")
+            sharpness  = st.slider("Sharpness",  0.5, 3.0, 1.0, key="sharpness")
+
+            enhanced = ImageEnhance.Brightness(enh_img).enhance(brightness)
+            enhanced = ImageEnhance.Contrast(enhanced).enhance(contrast)
+            enhanced = ImageEnhance.Sharpness(enhanced).enhance(sharpness)
+
+            col_e1, col_e2 = st.columns(2)
+            with col_e1:
+                st.image(enh_img,  caption="Original",  use_column_width=True)
+            with col_e2:
+                st.image(enhanced, caption="Enhanced",  use_column_width=True)
 
             st.download_button(
-                "Download PDF",
-                buffer.getvalue(),
-                "image_report.pdf",
-                "application/pdf"
+                "⬇️ Download Enhanced",
+                data=pil_to_bytes(enhanced.convert("RGB")),
+                file_name="enhanced.png",
+                mime="image/png",
+                key="dl_enh"
             )
-
-        # =====================================================
-        # 💬 FOLLOW-UP CHAT
-        # =====================================================
-        st.write("### 💬 Ask About Image")
-
-        user_q = st.chat_input("Ask something about the image...")
-
-        if user_q:
-            st.chat_message("user").write(user_q)
-
-            reply = answer_query(user_q, model_choice)
-
-            st.chat_message("assistant").write(reply)
 
 # =========================================
 # 📱 APPS PAGE
