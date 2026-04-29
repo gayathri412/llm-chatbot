@@ -10,9 +10,6 @@ import streamlit as st
 from app.orchestrator import answer_query
 
 
-api_key = st.secrets.get("OPENAI_API_KEY")
-openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
 st.set_page_config(page_title="AI Assistant", page_icon="🤖", layout="wide")
 
 # ---------- GLOBAL ----------
