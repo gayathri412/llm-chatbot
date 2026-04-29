@@ -474,9 +474,8 @@ elif page == "Images":
           [
               "black-forest-labs/FLUX.1-schnell",
               "black-forest-labs/FLUX.1-dev",
-              "stabilityai/stable-diffusion-2-1",
           ],
-           help="FLUX Schnell = fastest | FLUX Dev = best quality | SD 2.1 = classic"
+           help="FLUX Schnell = fastest | FLUX Dev = best quality"
        )
         st.caption(f"Model: `{model_id}`") 
 
