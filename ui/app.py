@@ -392,9 +392,8 @@ elif page == "Images":
     st.title("🖼️ Image AI Studio")
 
     # ── imports ──────────────────────────────────────────────
-    import io, math, os
+    import io, math, os, requests
     from PIL import Image, ImageEnhance, ImageDraw
-    from huggingface_hub import InferenceClient
     from dotenv import load_dotenv
 
     load_dotenv()
@@ -406,20 +405,29 @@ elif page == "Images":
     except Exception:
         OCR_AVAILABLE = False
 
-    # ── Hugging Face config ───────────────────────────────────
-    HF_TOKEN = st.secrets.get("HF_TOKEN") or os.environ.get("HF_TOKEN")
-
-    HF_MODELS = {
-        "⚡ FLUX Schnell (Fastest)":    "black-forest-labs/FLUX.1-schnell",
-        "🏆 FLUX Dev    (Best Quality)": "black-forest-labs/FLUX.1-dev",
-        "🎨 SD v2       (Classic)":      "stabilityai/stable-diffusion-2",
+    # ── Pollinations.ai config (100% free, no API key) ───────
+    POLLINATIONS_MODELS = {
+        "⚡ FLUX Schnell (Fastest)":  "flux",
+        "🏆 FLUX Dev    (Best)":      "flux-realism",
+        "🎨 Turbo       (Creative)":  "turbo",
     }
 
-    # ── helper: generate image via HF InferenceClient ────────
-    def generate_image_hf(prompt: str, model_id: str) -> Image.Image:
-        client = InferenceClient(token=HF_TOKEN)
-        image  = client.text_to_image(prompt=prompt, model=model_id)
-        return image  # returns PIL Image directly
+    # ── helper: generate image via Pollinations.ai ────────────
+    def generate_image(prompt: str, model: str = "flux",
+                       width: int = 512, height: int = 512,
+                       seed: int = None) -> Image.Image:
+        encoded = requests.utils.quote(prompt)
+        url = (
+            f"https://image.pollinations.ai/prompt/{encoded}"
+            f"?model={model}&width={width}&height={height}&nologo=true"
+        )
+        if seed is not None:
+            url += f"&seed={seed}"
+
+        resp = requests.get(url, timeout=120)
+        if resp.status_code != 200:
+            raise Exception(f"Pollinations error {resp.status_code}: {resp.text[:200]}")
+        return Image.open(io.BytesIO(resp.content)).convert("RGB")
 
     # ── helper: PIL → PNG bytes ───────────────────────────────
     def pil_to_bytes(img: Image.Image) -> bytes:
@@ -468,31 +476,32 @@ elif page == "Images":
     # ═══════════════════════════════════════════════════════════
     with tab_gen:
         st.subheader("Generate Images from Text")
+        st.caption("✅ Powered by Pollinations.ai — 100% free, no API key required")
 
-        model_id = st.selectbox(
-          "🤖 Choose Model",
-          [
-              "black-forest-labs/FLUX.1-schnell",
-              "black-forest-labs/FLUX.1-dev",
-          ],
-           help="FLUX Schnell = fastest | FLUX Dev = best quality"
-       )
-        st.caption(f"Model: `{model_id}`") 
+        model_label = st.selectbox(
+            "🤖 Choose Model",
+            list(POLLINATIONS_MODELS.keys()),
+            help="FLUX Schnell = fastest | FLUX Realism = photorealistic | Turbo = creative"
+        )
+        model_id = POLLINATIONS_MODELS[model_label]
+        st.caption(f"Model: `{model_id}`")
 
         prompt     = st.text_area("📝 Prompt", placeholder="A futuristic city at sunset, oil painting style…")
         neg_prompt = st.text_input("🚫 Negative Prompt (optional)", placeholder="blurry, bad quality, ugly…")
 
-        col_a, col_b = st.columns(2)
+        col_a, col_b, col_c = st.columns(3)
         with col_a:
             num_images = st.slider("Number of images", 1, 4, 1, key="gen_n")
         with col_b:
-            st.info("💡 Image size is auto-selected by the model")
+            size_choice = st.selectbox("Size", ["512×512", "768×768", "1024×1024", "512×768"], key="gen_size")
+        with col_c:
+            use_random_seed = st.checkbox("Random seed", value=True, key="gen_seed")
+
+        w, h = map(int, size_choice.replace("×", "x").split("x"))
 
         if st.button("🚀 Generate", key="btn_gen"):
             if not prompt.strip():
                 st.warning("Please enter a prompt.")
-            elif not HF_TOKEN:
-                st.error("HF_TOKEN not found. Add it to your .env or Streamlit Secrets.")
             else:
                 generated = []
                 progress  = st.progress(0, text="Starting…")
@@ -500,14 +509,15 @@ elif page == "Images":
                 for i in range(num_images):
                     progress.progress(
                         int((i / num_images) * 100),
-                        text=f"Generating image {i+1} of {num_images}… (may take 20–40s)"
+                        text=f"Generating image {i+1} of {num_images}…"
                     )
                     try:
                         full_prompt = prompt
                         if neg_prompt.strip():
-                            full_prompt += f", not {neg_prompt}"
+                            full_prompt += f", avoid {neg_prompt}"
 
-                        img = generate_image_hf(full_prompt, model_id)
+                        seed = None if use_random_seed else 42 + i
+                        img  = generate_image(full_prompt, model_id, w, h, seed)
                         generated.append(img)
 
                     except Exception as e:
@@ -517,7 +527,7 @@ elif page == "Images":
 
                 if generated:
                     st.success(f"✅ {len(generated)} image(s) generated!")
-                    captions = [f"#{i+1} • {model_id.split('/')[1]}" for i in range(len(generated))]
+                    captions = [f"#{i+1} • {model_label.split('(')[0].strip()}" for i in range(len(generated))]
                     render_image_grid(generated, captions)
 
     # ═══════════════════════════════════════════════════════════
@@ -525,10 +535,10 @@ elif page == "Images":
     # ═══════════════════════════════════════════════════════════
     with tab_var:
         st.subheader("Image Variations")
-        st.caption("Upload an image, describe it, and generate similar variations using your chosen model.")
+        st.caption("Upload an image, describe it, and generate similar variations.")
 
-        var_model_label = st.selectbox("🤖 Model", list(HF_MODELS.keys()), key="var_model")
-        var_model_id    = HF_MODELS[var_model_label]
+        var_model_label = st.selectbox("🤖 Model", list(POLLINATIONS_MODELS.keys()), key="var_model")
+        var_model_id    = POLLINATIONS_MODELS[var_model_label]
 
         var_file   = st.file_uploader("Upload source image", type=["png", "jpg", "jpeg"], key="var_up")
         var_prompt = st.text_input(
@@ -536,7 +546,14 @@ elif page == "Images":
             placeholder="A portrait of a woman in blue…",
             key="var_prompt"
         )
-        var_n = st.slider("Number of variations", 1, 4, 2, key="var_n")
+
+        col_v1, col_v2 = st.columns(2)
+        with col_v1:
+            var_n = st.slider("Number of variations", 1, 4, 2, key="var_n")
+        with col_v2:
+            var_size = st.selectbox("Size", ["512×512", "768×768", "1024×1024"], key="var_size")
+
+        vw, vh = map(int, var_size.replace("×", "x").split("x"))
 
         if var_file:
             src_img = Image.open(var_file)
@@ -545,8 +562,6 @@ elif page == "Images":
             if st.button("🔁 Generate Variations", key="btn_var"):
                 if not var_prompt.strip():
                     st.warning("Please describe the image to guide variations.")
-                elif not HF_TOKEN:
-                    st.error("HF_TOKEN not found.")
                 else:
                     variations = []
                     progress   = st.progress(0, text="Starting…")
@@ -558,7 +573,7 @@ elif page == "Images":
                         )
                         try:
                             varied = f"{var_prompt}, variation {i+1}, different angle, different lighting"
-                            img    = generate_image_hf(varied, var_model_id)
+                            img    = generate_image(varied, var_model_id, vw, vh, seed=i * 10)
                             variations.append(img)
                         except Exception as e:
                             st.error(f"Variation {i+1} failed: {e}")
@@ -575,10 +590,10 @@ elif page == "Images":
     # ═══════════════════════════════════════════════════════════
     with tab_edit:
         st.subheader("Inpaint / Edit")
-        st.caption("Describe what you want to change and generate new versions with that edit applied.")
+        st.caption("Describe what you want and generate edited versions based on your prompt.")
 
-        edit_model_label = st.selectbox("🤖 Model", list(HF_MODELS.keys()), key="edit_model")
-        edit_model_id    = HF_MODELS[edit_model_label]
+        edit_model_label = st.selectbox("🤖 Model", list(POLLINATIONS_MODELS.keys()), key="edit_model")
+        edit_model_id    = POLLINATIONS_MODELS[edit_model_label]
 
         edit_file   = st.file_uploader("Upload image to edit", type=["png", "jpg", "jpeg"], key="edit_up")
         edit_prompt = st.text_area(
@@ -586,7 +601,14 @@ elif page == "Images":
             placeholder="Same scene but at night with neon lights…",
             key="edit_prompt"
         )
-        edit_n = st.slider("Number of outputs", 1, 4, 1, key="edit_n")
+
+        col_e1, col_e2 = st.columns(2)
+        with col_e1:
+            edit_n    = st.slider("Number of outputs", 1, 4, 1, key="edit_n")
+        with col_e2:
+            edit_size = st.selectbox("Size", ["512×512", "768×768", "1024×1024"], key="edit_size")
+
+        ew, eh = map(int, edit_size.replace("×", "x").split("x"))
 
         if edit_file:
             src_img = Image.open(edit_file).convert("RGB")
@@ -595,8 +617,6 @@ elif page == "Images":
             if st.button("✏️ Apply Edit", key="btn_edit"):
                 if not edit_prompt.strip():
                     st.warning("Please enter an edit prompt.")
-                elif not HF_TOKEN:
-                    st.error("HF_TOKEN not found.")
                 else:
                     edits    = []
                     progress = st.progress(0, text="Starting…")
@@ -607,7 +627,7 @@ elif page == "Images":
                             text=f"Generating edit {i+1} of {edit_n}…"
                         )
                         try:
-                            img = generate_image_hf(edit_prompt, edit_model_id)
+                            img = generate_image(edit_prompt, edit_model_id, ew, eh, seed=i * 7)
                             edits.append(img)
                         except Exception as e:
                             st.error(f"Edit {i+1} failed: {e}")
