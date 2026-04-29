@@ -388,27 +388,15 @@ elif page == "Charts":
 # =========================================
 # 🖼️ IMAGES PAGE
 # =========================================
-
-# =========================================
-# 🖼️ IMAGES PAGE  — drop-in replacement
-# =========================================
-# HOW TO USE:
-#   1. pip install openai pillow pytesseract reportlab
-#   2. Add your key to .streamlit/secrets.toml:
-#        OPENAI_API_KEY = "sk-..."
-#   3. Replace the entire  `elif page == "Images":` block
-#      in your app.py with this code.
-# =========================================
 elif page == "Images":
     st.title("🖼️ Image AI Studio")
 
     # ── imports ──────────────────────────────────────────────
-    import io, math, requests
+    import io, math, requests, os, base64
     from PIL import Image, ImageEnhance, ImageDraw
-    from openai import OpenAI
-    from dotenv import load_dotenv
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet
+    from dotenv import load_dotenv
 
     load_dotenv()
 
@@ -419,33 +407,56 @@ elif page == "Images":
     except Exception:
         OCR_AVAILABLE = False
 
-    # ── OpenAI client ─────────────────────────────────────────
-    import os
-    api_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
-    openai_client = OpenAI(api_key=api_key)
-
     styles = getSampleStyleSheet()
 
-    # ── helper: download image URL → PIL ──────────────────────
-    def url_to_pil(url: str) -> Image.Image:
-        resp = requests.get(url, timeout=30)
-        return Image.open(io.BytesIO(resp.content)).convert("RGBA")
+    # ── Hugging Face config ───────────────────────────────────
+    HF_TOKEN = st.secrets.get("HF_TOKEN") or os.environ.get("HF_TOKEN")
 
-    # ── helper: PIL → PNG bytes ────────────────────────────────
+    HF_MODELS = {
+        "⚡ SD v1.5  (Fastest)":        "runwayml/stable-diffusion-v1-5",
+        "⚖️ SD v2.1  (Balanced)":       "stabilityai/stable-diffusion-2-1",
+        "🏆 SDXL 1.0 (Best Quality)":   "stabilityai/stable-diffusion-xl-base-1.0",
+    }
+
+    HF_API_URL = "https://api-inference.huggingface.co/models/{model}"
+
+    # ── helper: call HF inference API ────────────────────────
+    def generate_image_hf(prompt: str, model_id: str, width: int = 512, height: int = 512) -> Image.Image:
+        url     = HF_API_URL.format(model=model_id)
+        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "width":            width,
+                "height":           height,
+                "num_inference_steps": 30,
+                "guidance_scale":   7.5,
+            }
+        }
+        response = requests.post(url, headers=headers, json=payload, timeout=120)
+
+        if response.status_code == 503:
+            raise Exception("Model is loading, please wait 20–30 seconds and try again.")
+        if response.status_code != 200:
+            raise Exception(f"API error {response.status_code}: {response.text}")
+
+        return Image.open(io.BytesIO(response.content)).convert("RGB")
+
+    # ── helper: PIL → PNG bytes ───────────────────────────────
     def pil_to_bytes(img: Image.Image) -> bytes:
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         return buf.getvalue()
 
-    # ── helper: PIL → square PNG bytes (for DALL-E 2 API) ──────
-    def to_square_png_bytes(img: Image.Image, size: int = 1024) -> bytes:
+    # ── helper: PIL → square PNG bytes ───────────────────────
+    def to_square_png_bytes(img: Image.Image, size: int = 512) -> io.BytesIO:
         img = img.convert("RGBA").resize((size, size))
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         buf.seek(0)
         return buf
 
-    # ── helper: render dynamic image grid ─────────────────────
+    # ── helper: dynamic image grid with download buttons ─────
     def render_image_grid(images: list, captions: list = None):
         n = len(images)
         if n == 0:
@@ -459,19 +470,19 @@ elif page == "Images":
                 img_idx = row * cols_count + col_idx
                 if img_idx >= n:
                     break
-                img = images[img_idx]
+                img     = images[img_idx]
                 caption = captions[img_idx] if captions else f"Image {img_idx + 1}"
                 with cols[col_idx]:
                     st.image(img, caption=caption, use_column_width=True)
                     st.download_button(
                         label="⬇️ Download",
                         data=pil_to_bytes(img),
-                        file_name=f"dalle_{img_idx+1}.png",
+                        file_name=f"image_{img_idx + 1}.png",
                         mime="image/png",
-                        key=f"dl_{img_idx}_{caption[:10]}"
+                        key=f"dl_{row}_{col_idx}_{img_idx}"
                     )
 
-    # ── TABS ──────────────────────────────────────────────────
+    # ── TABS ─────────────────────────────────────────────────
     tab_gen, tab_var, tab_edit, tab_preview, tab_ocr, tab_enhance = st.tabs([
         "🎨 Generate",
         "🔁 Variations",
@@ -482,178 +493,173 @@ elif page == "Images":
     ])
 
     # ═══════════════════════════════════════════════════════════
-    # 🎨 TAB 1 — GENERATE (text → image matrix)
+    # 🎨 TAB 1 — GENERATE
     # ═══════════════════════════════════════════════════════════
     with tab_gen:
         st.subheader("Generate Images from Text")
 
-        prompt = st.text_area("📝 Prompt", placeholder="A futuristic city at sunset, oil painting style…")
+        # ── model selector ────────────────────────────────────
+        model_label = st.selectbox(
+            "🤖 Choose Model",
+            list(HF_MODELS.keys()),
+            help="SD v1.5 = fastest | SD v2.1 = balanced | SDXL = best quality"
+        )
+        model_id = HF_MODELS[model_label]
+        st.caption(f"Model ID: `{model_id}`")
+
+        prompt     = st.text_area("📝 Prompt", placeholder="A futuristic city at sunset, oil painting style…")
+        neg_prompt = st.text_input("🚫 Negative Prompt (optional)", placeholder="blurry, bad quality, ugly…")
 
         col_a, col_b, col_c = st.columns(3)
         with col_a:
-            gen_model = st.selectbox("Model", ["dall-e-3", "dall-e-2"], key="gen_model")
+            num_images = st.slider("Number of images", 1, 4, 1, key="gen_n")
         with col_b:
-            if gen_model == "dall-e-3":
-                num_images = 1
-                st.info("DALL-E 3 supports 1 image only.")
-            else:
-                num_images = st.slider("Number of images", 1, 4, 1, key="gen_n")
+            size_choice = st.selectbox("Size", ["512×512", "768×768", "512×768"], key="gen_size")
         with col_c:
-            size_options = {
-                "dall-e-3": ["1024x1024", "1792x1024", "1024x1792"],
-                "dall-e-2": ["256x256", "512x512", "1024x1024"],
-            }
-            size = st.selectbox("Size", size_options[gen_model], key="gen_size")
+            steps = st.slider("Quality steps", 10, 50, 30, key="gen_steps",
+                              help="More steps = better quality but slower")
 
-        if gen_model == "dall-e-3":
-            quality = st.radio("Quality", ["standard", "hd"], horizontal=True)
-            style   = st.radio("Style",   ["vivid", "natural"], horizontal=True)
-        else:
-            quality = "standard"
-            style   = "vivid"
+        # parse size
+        w, h = map(int, size_choice.replace("×", "x").split("x"))
 
         if st.button("🚀 Generate", key="btn_gen"):
             if not prompt.strip():
                 st.warning("Please enter a prompt.")
+            elif not HF_TOKEN:
+                st.error("HF_TOKEN not found. Add it to your .env or Streamlit Secrets.")
             else:
-                with st.spinner(f"Generating {num_images} image(s)…"):
+                generated = []
+                progress  = st.progress(0, text="Starting…")
+
+                for i in range(num_images):
+                    progress.progress(
+                        int((i / num_images) * 100),
+                        text=f"Generating image {i+1} of {num_images}…"
+                    )
                     try:
-                        kwargs = dict(
-                            model=gen_model,
-                            prompt=prompt,
-                            n=num_images,
-                            size=size,
-                            response_format="url",
-                        )
-                        if gen_model == "dall-e-3":
-                            kwargs["quality"] = quality
-                            kwargs["style"]   = style
+                        full_prompt = prompt
+                        if neg_prompt.strip():
+                            full_prompt += f" | negative: {neg_prompt}"
 
-                        response = openai_client.images.generate(**kwargs)
-
-                        images   = [url_to_pil(d.url) for d in response.data]
-                        captions = [f"#{i+1} — {size}" for i in range(len(images))]
-
-                        st.success(f"✅ {len(images)} image(s) generated!")
-                        render_image_grid(images, captions)
-
-                        if gen_model == "dall-e-3" and response.data[0].revised_prompt:
-                            st.info(f"📝 Revised prompt: {response.data[0].revised_prompt}")
+                        img = generate_image_hf(full_prompt, model_id, w, h)
+                        generated.append(img)
 
                     except Exception as e:
-                        st.error(f"Generation failed: {e}")
+                        st.error(f"Image {i+1} failed: {e}")
+
+                progress.progress(100, text="Done!")
+
+                if generated:
+                    st.success(f"✅ {len(generated)} image(s) generated!")
+                    captions = [f"#{i+1} • {model_label.split('(')[0].strip()}" for i in range(len(generated))]
+                    render_image_grid(generated, captions)
 
     # ═══════════════════════════════════════════════════════════
-    # 🔁 TAB 2 — VARIATIONS  (DALL-E 2 only)
+    # 🔁 TAB 2 — VARIATIONS
     # ═══════════════════════════════════════════════════════════
     with tab_var:
-        st.subheader("Image Variations  *(DALL-E 2)*")
-        st.caption("Upload a square PNG (<4 MB) and generate similar versions.")
+        st.subheader("Image Variations")
+        st.caption("Upload an image, describe it, and generate similar variations using your chosen model.")
+
+        var_model_label = st.selectbox("🤖 Model", list(HF_MODELS.keys()), key="var_model")
+        var_model_id    = HF_MODELS[var_model_label]
 
         var_file = st.file_uploader("Upload source image", type=["png", "jpg", "jpeg"], key="var_up")
+        var_prompt = st.text_input("📝 Describe the image (used as base prompt)", placeholder="A portrait of a woman in blue…", key="var_prompt")
 
         col_v1, col_v2 = st.columns(2)
         with col_v1:
-            var_n    = st.slider("Number of variations", 1, 4, 2, key="var_n")
+            var_n = st.slider("Number of variations", 1, 4, 2, key="var_n")
         with col_v2:
-            var_size = st.selectbox("Size", ["256x256", "512x512", "1024x1024"], key="var_size")
+            var_size = st.selectbox("Size", ["512×512", "768×768"], key="var_size")
+
+        vw, vh = map(int, var_size.replace("×", "x").split("x"))
 
         if var_file:
             src_img = Image.open(var_file)
             st.image(src_img, caption="Source image", width=300)
 
             if st.button("🔁 Generate Variations", key="btn_var"):
-                with st.spinner("Creating variations…"):
-                    try:
-                        px      = int(var_size.split("x")[0])
-                        png_buf = to_square_png_bytes(src_img, px)
+                if not var_prompt.strip():
+                    st.warning("Please describe the image to guide variations.")
+                elif not HF_TOKEN:
+                    st.error("HF_TOKEN not found.")
+                else:
+                    variations = []
+                    progress   = st.progress(0, text="Starting…")
 
-                        response = openai_client.images.create_variation(
-                            image=png_buf,
-                            n=var_n,
-                            size=var_size,
-                            response_format="url",
+                    for i in range(var_n):
+                        progress.progress(
+                            int((i / var_n) * 100),
+                            text=f"Generating variation {i+1} of {var_n}…"
                         )
+                        try:
+                            # slightly vary prompt each time for diversity
+                            varied = f"{var_prompt}, variation {i+1}, different angle, different lighting"
+                            img    = generate_image_hf(varied, var_model_id, vw, vh)
+                            variations.append(img)
+                        except Exception as e:
+                            st.error(f"Variation {i+1} failed: {e}")
 
-                        images   = [url_to_pil(d.url) for d in response.data]
-                        captions = [f"Variation {i+1}" for i in range(len(images))]
+                    progress.progress(100, text="Done!")
 
-                        st.success(f"✅ {len(images)} variation(s) ready!")
-                        render_image_grid(images, captions)
-
-                    except Exception as e:
-                        st.error(f"Variation failed: {e}")
+                    if variations:
+                        st.success(f"✅ {len(variations)} variation(s) ready!")
+                        captions = [f"Variation {i+1}" for i in range(len(variations))]
+                        render_image_grid(variations, captions)
 
     # ═══════════════════════════════════════════════════════════
-    # ✏️ TAB 3 — INPAINT / EDIT  (DALL-E 2 only)
+    # ✏️ TAB 3 — INPAINT / EDIT
     # ═══════════════════════════════════════════════════════════
     with tab_edit:
-        st.subheader("Inpainting / Edit  *(DALL-E 2)*")
-        st.caption(
-            "Upload your image + a mask PNG (transparent area = region to regenerate). "
-            "Or use the auto-mask option to blank the bottom half."
-        )
+        st.subheader("Inpaint / Edit")
+        st.caption("Describe what you want to change and generate new versions with that edit applied.")
 
-        edit_file = st.file_uploader("Upload image to edit", type=["png", "jpg", "jpeg"], key="edit_up")
-        mask_file = st.file_uploader("Upload mask (optional)", type=["png"], key="mask_up")
+        edit_model_label = st.selectbox("🤖 Model", list(HF_MODELS.keys()), key="edit_model")
+        edit_model_id    = HF_MODELS[edit_model_label]
 
-        edit_prompt = st.text_area("✏️ Edit prompt", placeholder="Replace background with a snowy mountain landscape…", key="edit_prompt")
+        edit_file   = st.file_uploader("Upload image to edit", type=["png", "jpg", "jpeg"], key="edit_up")
+        edit_prompt = st.text_area("✏️ Edit prompt", placeholder="Same scene but at night with neon lights…", key="edit_prompt")
 
         col_e1, col_e2 = st.columns(2)
         with col_e1:
             edit_n    = st.slider("Number of outputs", 1, 4, 1, key="edit_n")
         with col_e2:
-            edit_size = st.selectbox("Size", ["256x256", "512x512", "1024x1024"], key="edit_size")
+            edit_size = st.selectbox("Size", ["512×512", "768×768"], key="edit_size")
 
-        auto_mask = st.checkbox("Auto-mask bottom half (if no mask uploaded)", value=True)
+        ew, eh = map(int, edit_size.replace("×", "x").split("x"))
 
         if edit_file:
-            src_img = Image.open(edit_file).convert("RGBA")
+            src_img = Image.open(edit_file).convert("RGB")
             st.image(src_img, caption="Image to edit", width=300)
 
             if st.button("✏️ Apply Edit", key="btn_edit"):
                 if not edit_prompt.strip():
                     st.warning("Please enter an edit prompt.")
+                elif not HF_TOKEN:
+                    st.error("HF_TOKEN not found.")
                 else:
-                    with st.spinner("Editing image…"):
+                    edits    = []
+                    progress = st.progress(0, text="Starting…")
+
+                    for i in range(edit_n):
+                        progress.progress(
+                            int((i / edit_n) * 100),
+                            text=f"Generating edit {i+1} of {edit_n}…"
+                        )
                         try:
-                            px      = int(edit_size.split("x")[0])
-                            img_buf = to_square_png_bytes(src_img, px)
-
-                            if mask_file:
-                                mask_img = Image.open(mask_file).convert("RGBA").resize((px, px))
-                            elif auto_mask:
-                                mask_img = Image.new("RGBA", (px, px), (255, 255, 255, 255))
-                                draw     = ImageDraw.Draw(mask_img)
-                                draw.rectangle([0, px // 2, px, px], fill=(0, 0, 0, 0))
-                            else:
-                                mask_img = None
-
-                            mask_buf = to_square_png_bytes(mask_img, px) if mask_img else None
-
-                            kwargs = dict(
-                                image=img_buf,
-                                prompt=edit_prompt,
-                                n=edit_n,
-                                size=edit_size,
-                                response_format="url",
-                            )
-                            if mask_buf:
-                                kwargs["mask"] = mask_buf
-
-                            response = openai_client.images.edit(**kwargs)
-
-                            images   = [url_to_pil(d.url) for d in response.data]
-                            captions = [f"Edit {i+1}" for i in range(len(images))]
-
-                            st.success(f"✅ {len(images)} edited image(s) ready!")
-
-                            all_imgs     = [src_img.convert("RGB")] + images
-                            all_captions = ["Original"] + captions
-                            render_image_grid(all_imgs, all_captions)
-
+                            img = generate_image_hf(edit_prompt, edit_model_id, ew, eh)
+                            edits.append(img)
                         except Exception as e:
-                            st.error(f"Edit failed: {e}")
+                            st.error(f"Edit {i+1} failed: {e}")
+
+                    progress.progress(100, text="Done!")
+
+                    if edits:
+                        st.success(f"✅ {len(edits)} edited image(s) ready!")
+                        all_imgs     = [src_img] + edits
+                        all_captions = ["Original"] + [f"Edit {i+1}" for i in range(len(edits))]
+                        render_image_grid(all_imgs, all_captions)
 
     # ═══════════════════════════════════════════════════════════
     # 📷 TAB 4 — PREVIEW
@@ -741,6 +747,7 @@ elif page == "Images":
                 mime="image/png",
                 key="dl_enh"
             )
+
 
 
    
