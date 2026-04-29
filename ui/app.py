@@ -399,12 +399,18 @@ elif page == "Charts":
 #   3. Replace the entire  `elif page == "Images":` block
 #      in your app.py with this code.
 # =========================================
-
 elif page == "Images":
     st.title("🖼️ Image AI Studio")
 
     # ── imports ──────────────────────────────────────────────
-    
+    import io, math, requests
+    from PIL import Image, ImageEnhance, ImageDraw
+    from openai import OpenAI
+    from dotenv import load_dotenv
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+
+    load_dotenv()
 
     try:
         import pytesseract
@@ -414,9 +420,9 @@ elif page == "Images":
         OCR_AVAILABLE = False
 
     # ── OpenAI client ─────────────────────────────────────────
-    from dotenv import load_dotenv
-    load_dotenv()
-    
+    import os
+    api_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    openai_client = OpenAI(api_key=api_key)
 
     styles = getSampleStyleSheet()
 
@@ -441,11 +447,10 @@ elif page == "Images":
 
     # ── helper: render dynamic image grid ─────────────────────
     def render_image_grid(images: list, captions: list = None):
-        """Render a list of PIL images in a dynamic grid with download buttons."""
         n = len(images)
         if n == 0:
             return
-        cols_count = min(n, 4)          # max 4 per row
+        cols_count = min(n, 4)
         rows = math.ceil(n / cols_count)
 
         for row in range(rows):
@@ -488,9 +493,11 @@ elif page == "Images":
         with col_a:
             gen_model = st.selectbox("Model", ["dall-e-3", "dall-e-2"], key="gen_model")
         with col_b:
-            # DALL-E 3 supports only n=1; DALL-E 2 supports 1-4
-            max_n = 1 if gen_model == "dall-e-3" else 4
-            num_images = st.slider("Number of images", 1, max_n, 1, key="gen_n")
+            if gen_model == "dall-e-3":
+                num_images = 1
+                st.info("DALL-E 3 supports 1 image only.")
+            else:
+                num_images = st.slider("Number of images", 1, 4, 1, key="gen_n")
         with col_c:
             size_options = {
                 "dall-e-3": ["1024x1024", "1792x1024", "1024x1792"],
@@ -501,6 +508,9 @@ elif page == "Images":
         if gen_model == "dall-e-3":
             quality = st.radio("Quality", ["standard", "hd"], horizontal=True)
             style   = st.radio("Style",   ["vivid", "natural"], horizontal=True)
+        else:
+            quality = "standard"
+            style   = "vivid"
 
         if st.button("🚀 Generate", key="btn_gen"):
             if not prompt.strip():
@@ -527,7 +537,6 @@ elif page == "Images":
                         st.success(f"✅ {len(images)} image(s) generated!")
                         render_image_grid(images, captions)
 
-                        # store revised prompt (DALL-E 3 rewrites prompts)
                         if gen_model == "dall-e-3" and response.data[0].revised_prompt:
                             st.info(f"📝 Revised prompt: {response.data[0].revised_prompt}")
 
@@ -556,7 +565,7 @@ elif page == "Images":
             if st.button("🔁 Generate Variations", key="btn_var"):
                 with st.spinner("Creating variations…"):
                     try:
-                        px = int(var_size.split("x")[0])
+                        px      = int(var_size.split("x")[0])
                         png_buf = to_square_png_bytes(src_img, px)
 
                         response = openai_client.images.create_variation(
@@ -608,15 +617,14 @@ elif page == "Images":
                 else:
                     with st.spinner("Editing image…"):
                         try:
-                            px = int(edit_size.split("x")[0])
+                            px      = int(edit_size.split("x")[0])
                             img_buf = to_square_png_bytes(src_img, px)
 
-                            # Build mask
                             if mask_file:
                                 mask_img = Image.open(mask_file).convert("RGBA").resize((px, px))
                             elif auto_mask:
                                 mask_img = Image.new("RGBA", (px, px), (255, 255, 255, 255))
-                                draw = ImageDraw.Draw(mask_img)
+                                draw     = ImageDraw.Draw(mask_img)
                                 draw.rectangle([0, px // 2, px, px], fill=(0, 0, 0, 0))
                             else:
                                 mask_img = None
@@ -640,8 +648,6 @@ elif page == "Images":
 
                             st.success(f"✅ {len(images)} edited image(s) ready!")
 
-                            # show side-by-side original vs edits
-                            st.write("**Original → Edits**")
                             all_imgs     = [src_img.convert("RGB")] + images
                             all_captions = ["Original"] + captions
                             render_image_grid(all_imgs, all_captions)
@@ -650,7 +656,7 @@ elif page == "Images":
                             st.error(f"Edit failed: {e}")
 
     # ═══════════════════════════════════════════════════════════
-    # 📷 TAB 4 — PREVIEW uploaded image
+    # 📷 TAB 4 — PREVIEW
     # ═══════════════════════════════════════════════════════════
     with tab_preview:
         st.subheader("Preview Uploaded Image")
@@ -662,7 +668,6 @@ elif page == "Images":
             st.write(f"**Size:** {image.size[0]} × {image.size[1]} px")
             st.write(f"**Mode:** {image.mode}")
 
-            # AI Analysis
             if st.button("🤖 Analyze Image", key="btn_analyze"):
                 with st.spinner("Analyzing…"):
                     response = answer_query(
@@ -672,7 +677,6 @@ elif page == "Images":
                 st.write("### 🤖 AI Insight")
                 st.write(response)
 
-            # Download original
             st.download_button(
                 "⬇️ Download Original",
                 data=pil_to_bytes(image.convert("RGB")),
@@ -715,8 +719,7 @@ elif page == "Images":
         enh_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="enh_up")
 
         if enh_file:
-            enh_img = Image.open(enh_file)
-
+            enh_img    = Image.open(enh_file)
             brightness = st.slider("Brightness", 0.5, 2.0, 1.0, key="brightness")
             contrast   = st.slider("Contrast",   0.5, 2.0, 1.0, key="contrast")
             sharpness  = st.slider("Sharpness",  0.5, 3.0, 1.0, key="sharpness")
@@ -727,7 +730,7 @@ elif page == "Images":
 
             col_e1, col_e2 = st.columns(2)
             with col_e1:
-                st.image(enh_img,  caption="Original",  use_column_width=True)
+                st.image(enh_img,  caption="Original", use_column_width=True)
             with col_e2:
                 st.image(enhanced, caption="Enhanced",  use_column_width=True)
 
@@ -739,6 +742,8 @@ elif page == "Images":
                 key="dl_enh"
             )
 
+
+   
 # =========================================
 # 📱 APPS PAGE
 # =========================================
