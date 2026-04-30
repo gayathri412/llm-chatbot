@@ -1,11 +1,10 @@
-from app.tools import calculator_tool, file_analyzer_tool
-from data.json_fallback import fetch_context
+﻿from app.tools import calculator_tool, file_analyzer_tool
+from data.rag import format_context, retrieve_context
 from llm.client import chat_completion
 
 
-# 🔧 TOOL DECISION (LLM-based)
+# TOOL DECISION (LLM-based)
 def decide_tool_llm(query, model_choice):
-
     tool_prompt = f"""
 You are an AI assistant that selects tools.
 
@@ -15,9 +14,9 @@ Available tools:
 3. none - for ALL explanations, data analysis, facts, research, general questions
 
 IMPORTANT:
-- "Explain this dataset" → use "none" (NOT calculator)
-- "Analyze this data" → use "none" (NOT calculator)
-- Questions with numbers but asking for explanation → use "none"
+- "Explain this dataset" -> use "none" (NOT calculator)
+- "Analyze this data" -> use "none" (NOT calculator)
+- Questions with numbers but asking for explanation -> use "none"
 - Only use calculator for actual math problems to solve
 
 Question: {query}
@@ -28,22 +27,18 @@ calculator OR file OR none
 
     messages = [
         {"role": "system", "content": "You are a tool selector."},
-        {"role": "user", "content": tool_prompt}
+        {"role": "user", "content": tool_prompt},
     ]
 
     try:
         decision = chat_completion(messages, model_choice)
 
-        # ✅ safety checks
         if not decision or not isinstance(decision, str):
             return "none"
 
         decision = decision.strip().lower()
-
-        # sometimes model returns sentence → take first word
         decision = decision.split()[0]
 
-        # ✅ enforce valid outputs
         if decision not in ["calculator", "file", "none"]:
             return "none"
 
@@ -54,52 +49,47 @@ calculator OR file OR none
         return "none"
 
 
-# 🧠 MAIN FUNCTION
+# MAIN FUNCTION
 def answer_query(query, model_choice="Llama"):
-
-    # 🔍 Extract latest question
     if "The user now asks:" in query:
         latest_question = query.split("The user now asks:")[-1].strip()
     else:
         latest_question = query.strip()
 
-    # 📄 FILE HANDLING (large input)
     if len(query) > 1000:
         return file_analyzer_tool(query, model_choice)
 
-    # 🔧 TOOL DECISION
     tool = decide_tool_llm(latest_question, model_choice)
 
     if tool == "calculator":
         return calculator_tool(latest_question)
 
-    # 🔍 RAG context
-    context = fetch_context(latest_question)
-    context_text = "\n".join(context) if context else ""
+    retrieved_context = retrieve_context(latest_question)
+    context_text = format_context(retrieved_context)
 
-    # 🧠 FINAL PROMPT
     final_prompt = f"""
 You are a smart and helpful AI assistant.
 
 Answer the user's question clearly and accurately.
 
 Instructions:
-- Use context if available
-- Otherwise use general knowledge
+- First use the retrieved context when it is relevant
+- If the context does not contain the answer, say that clearly and then use general knowledge
+- Do not invent facts that are not supported by the context
 - Keep explanation simple and clear
 
 User Question:
 {latest_question}
 
-Context:
-{context_text}
+Retrieved Context:
+{context_text if context_text else "No relevant local context found."}
 
 Answer:
 """
 
     messages = [
         {"role": "system", "content": "You are a helpful AI assistant."},
-        {"role": "user", "content": final_prompt}
+        {"role": "user", "content": final_prompt},
     ]
 
     try:
