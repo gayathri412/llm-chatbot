@@ -468,8 +468,9 @@ st.markdown(f"""
   <a href="?page=Chat" class="nav-icon {get_active("Chat")}" title="New Chat">💬</a>
   <a href="?page=Search" class="nav-icon {get_active("Search")}" title="Search">🔍</a>
   <a href="?page=Charts" class="nav-icon {get_active("Charts")}" title="Charts">📊</a>
-  <a href="?page=Images" class="nav-icon {get_active("Images")}" title="Images">�️</a>
-  <a href="?page=Apps" class="nav-icon {get_active("Apps")}" title="Apps">�</a>
+  <a href="?page=BigData" class="nav-icon {get_active("BigData")}" title="Big Data">🗄️</a>
+  <a href="?page=Images" class="nav-icon {get_active("Images")}" title="Images">🖼️</a>
+  <a href="?page=Apps" class="nav-icon {get_active("Apps")}" title="Apps">📱</a>
   <a href="?page=Research" class="nav-icon {get_active("Research")}" title="Research">🧠</a>
   <a href="?page=Codex" class="nav-icon {get_active("Codex")}" title="Codex">💻</a>
   <a href="?page=GPTs" class="nav-icon {get_active("GPTs")}" title="GPTs">🤖</a>
@@ -941,7 +942,185 @@ elif page == "Charts":
             st.write(reply)
 
 # =========================================
-# 🖼️ IMAGES PAGE
+# �️ BIG DATA PAGE
+# =========================================
+elif page == "BigData":
+    st.title("🗄️ Big Data Query & Analytics")
+
+    import pandas as pd
+    import io
+    from prompts.compose import build_bigdata_analysis_prompt, build_sql_explanation_prompt
+
+    # Try to import BigQuery client
+    try:
+        from data.bq_client import BigQueryClient, BQ_AVAILABLE
+    except ImportError:
+        BQ_AVAILABLE = False
+        BigQueryClient = None
+
+    # Tabs for Big Data sections
+    bdtab1, bdtab2, bdtab3 = st.tabs(["🔍 SQL Query", "📤 Upload & Query", "📊 BigQuery Connect"])
+
+    with bdtab1:
+        st.write("### Write SQL Query")
+        st.info("Write SQL queries to analyze your data. Works with uploaded datasets or BigQuery.")
+
+        sql_query = st.text_area("SQL Query", 
+            placeholder="SELECT * FROM my_table LIMIT 10",
+            height=150
+        )
+
+        if st.button("▶️ Run Query", key="run_sql"):
+            if sql_query.strip():
+                with st.spinner("Executing query..."):
+                    # For demo, use a sample dataframe
+                    # In production, this would connect to BigQuery or database
+                    try:
+                        # Try to use pandasql if available
+                        try:
+                            from pandasql import sqldf
+                            pysqldf = lambda q: sqldf(q, globals())
+                            
+                            # Check if we have a uploaded dataset
+                            if 'uploaded_df' in st.session_state:
+                                result_df = pysqldf(sql_query)
+                                st.dataframe(result_df)
+                                st.session_state.last_query_result = result_df
+                            else:
+                                st.info("Upload a CSV first in the 'Upload & Query' tab to query it with SQL")
+                        except ImportError:
+                            st.warning("Install pandasql for SQL querying: pip install pandasql")
+                    except Exception as e:
+                        st.error(f"Query error: {e}")
+
+        # AI Explain Query
+        if sql_query.strip() and st.button("🤖 Explain This Query"):
+            from llm.client import chat_completion
+            messages = build_sql_explanation_prompt(sql_query)
+            explanation = chat_completion(messages, model_choice)
+            st.write("#### Query Explanation")
+            st.write(explanation)
+
+    with bdtab2:
+        st.write("### Upload Data & Query")
+
+        uploaded_file = st.file_uploader("Upload CSV or JSON", type=["csv", "json"])
+
+        if uploaded_file:
+            if uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+                st.session_state.uploaded_df = df
+                st.success(f"Loaded {len(df)} rows")
+
+                # Data preview
+                st.write("#### Data Preview")
+                st.dataframe(df.head(10))
+
+                # Schema info
+                st.write("#### Schema")
+                schema_info = pd.DataFrame({
+                    'Column': df.columns,
+                    'Type': df.dtypes.astype(str),
+                    'Non-Null': df.count(),
+                    'Null': df.isnull().sum()
+                })
+                st.dataframe(schema_info)
+
+                # Quick stats
+                st.write("#### Quick Statistics")
+                st.dataframe(df.describe())
+
+            elif uploaded_file.name.endswith('.json'):
+                import json
+                data = json.load(uploaded_file)
+                if isinstance(data, list):
+                    df = pd.DataFrame(data)
+                    st.session_state.uploaded_df = df
+                    st.success(f"Loaded {len(df)} rows from JSON")
+                    st.dataframe(df.head(10))
+
+        # Query Builder
+        if 'uploaded_df' in st.session_state:
+            st.write("### Query Builder")
+            df = st.session_state.uploaded_df
+
+            col1, col2 = st.columns(2)
+            with col1:
+                filter_col = st.selectbox("Filter Column", ["None"] + list(df.columns))
+            with col2:
+                if filter_col != "None":
+                    filter_val = st.text_input("Filter Value")
+
+            if st.button("🔍 Apply Filter"):
+                if filter_col != "None" and filter_val:
+                    filtered_df = df[df[filter_col].astype(str).str.contains(filter_val, case=False, na=False)]
+                    st.dataframe(filtered_df)
+                    st.session_state.filtered_result = filtered_df
+
+            # AI Analysis
+            st.write("### AI Data Analysis")
+            if st.button("🤖 Analyze Dataset"):
+                with st.spinner("Analyzing..."):
+                    from llm.client import chat_completion
+                    summary = df.describe(include='all').to_string()
+                    analysis = answer_query(f"Analyze this dataset in detail:\n{summary}", model_choice)
+                    st.write(analysis)
+
+    with bdtab3:
+        st.write("### BigQuery Connection")
+
+        if not BQ_AVAILABLE:
+            st.error("BigQuery client not available. Install with: `pip install google-cloud-bigquery`")
+        else:
+            st.success("BigQuery client available")
+
+            project_id = st.text_input("GCP Project ID", placeholder="my-project-123")
+
+            if st.button("🔗 Connect to BigQuery"):
+                try:
+                    client = BigQueryClient(project_id if project_id else None)
+                    st.session_state.bq_client = client
+                    st.success(f"Connected to project: {client.project_id}")
+                except Exception as e:
+                    st.error(f"Connection failed: {e}")
+
+            if 'bq_client' in st.session_state:
+                client = st.session_state.bq_client
+
+                # List tables
+                st.write("#### Available Tables")
+                dataset = st.text_input("Dataset Name", value="analytics")
+                if st.button("📋 List Tables"):
+                    try:
+                        tables = client.list_tables(dataset)
+                        st.write(tables)
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+
+                # Run BigQuery SQL
+                st.write("#### Run BigQuery Query")
+                bq_query = st.text_area("Query", 
+                    f"SELECT * FROM `{client.project_id}.{dataset}.chat_context_docs` LIMIT 10",
+                    height=100
+                )
+                if st.button("▶️ Execute"):
+                    try:
+                        result_df = client.execute_query(bq_query)
+                        st.dataframe(result_df)
+
+                        # AI Analysis of results
+                        if st.button("🤖 Analyze Results"):
+                            with st.spinner("Analyzing..."):
+                                from llm.client import chat_completion
+                                results_summary = result_df.to_string()
+                                messages = build_bigdata_analysis_prompt("Analyze these results", bq_query, results_summary)
+                                analysis = chat_completion(messages, model_choice)
+                                st.write(analysis)
+                    except Exception as e:
+                        st.error(f"Query error: {e}")
+
+# =========================================
+# �🖼️ IMAGES PAGE
 # =========================================
 elif page == "Images":
     st.title("🖼️ Image AI Studio")
