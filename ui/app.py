@@ -46,22 +46,39 @@ button[kind="header"],
 /* ── FILE UPLOADER — overlaid on the + button in bottom toolbar ── */
 [data-testid="stFileUploader"] {
     position: fixed !important;
-    bottom: 8px !important;
-    left: 68px !important;    /* over the + button */
+    bottom: 4px !important;
+    left: 62px !important;
     right: auto !important;
     z-index: 1100 !important;
-    width: 38px !important;
-    height: 38px !important;
+    width: 44px !important;
+    height: 44px !important;
 }
-/* Hide the section/dropzone chrome entirely */
-[data-testid="stFileUploader"] section,
-[data-testid="stFileUploaderDropzone"],
+/* Keep the section visible but transparent so it stays clickable */
+[data-testid="stFileUploader"] section {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    min-height: unset !important;
+    width: 44px !important;
+    height: 44px !important;
+}
 [data-testid="stFileUploaderDropzoneInstructions"],
 [data-testid="stFileUploader"] span,
-[data-testid="stFileUploader"] small {
+[data-testid="stFileUploader"] small,
+[data-testid="stFileUploader"] label {
     display: none !important;
 }
-[data-testid="stFileUploader"] label { display: none !important; }
+/* Dropzone — transparent overlay that IS clickable */
+[data-testid="stFileUploaderDropzone"] {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    min-height: 44px !important;
+    width: 44px !important;
+    height: 44px !important;
+    cursor: pointer !important;
+    opacity: 0 !important;   /* invisible but fully clickable */
+}
 /* Only show the "Browse files" button — style it as a 📎 icon */
 [data-testid="stFileUploader"] button {
     display: flex !important;
@@ -485,20 +502,39 @@ if page == "Chat":
     chat_history = st.session_state.chats[st.session_state.current_chat]
 
     # ---------- FILE UPLOAD — embedded in bottom bar as 📎 icon ----------
-    uploaded_file = st.file_uploader("📎", type=["txt", "pdf"], label_visibility="collapsed",
-                                      key="chat_file_uploader")
+    uploaded_file = st.file_uploader(
+        "📎",
+        type=["txt", "pdf", "docx"],
+        label_visibility="collapsed",
+        key="chat_file_uploader"
+    )
 
     file_text = ""
     if uploaded_file:
-        if uploaded_file.type == "text/plain":
-            file_text = uploaded_file.read().decode("utf-8")
-        elif uploaded_file.type == "application/pdf":
+        fname = uploaded_file.name.lower()
+
+        if fname.endswith(".txt"):
+            file_text = uploaded_file.read().decode("utf-8", errors="ignore")
+
+        elif fname.endswith(".pdf"):
             import pdfplumber
             with pdfplumber.open(uploaded_file) as pdf:
                 for p in pdf.pages:
                     file_text += p.extract_text() or ""
+
+        elif fname.endswith(".docx"):
+            try:
+                from docx import Document
+                doc = Document(uploaded_file)
+                file_text = "\n".join([para.text for para in doc.paragraphs])
+            except ImportError:
+                st.error("Install python-docx: pip install python-docx")
+
         file_text = file_text[:5000]
-        st.toast(f"✅ {uploaded_file.name} ready", icon="📎")
+        if file_text.strip():
+            st.toast(f"✅ {uploaded_file.name} ready", icon="📎")
+        else:
+            st.warning(f"⚠️ Could not extract text from {uploaded_file.name}")
 
     # ---------- WELCOME CARD (shown on fresh chat) ----------
     if not chat_history:
