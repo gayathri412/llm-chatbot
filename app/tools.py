@@ -35,11 +35,11 @@ def file_analyzer_tool(text: str, model_choice="Llama"):
     chunk_size = 800
     chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
-    partials = []
+    # Take first 2 chunks only (to avoid token limits)
+    content_to_analyze = "\n\n".join(chunks[:2])
 
-    for chunk in chunks[:2]:
-        prompt = f"""
-Create a clean and well-structured summary.
+    prompt = f"""
+Create a clean and well-structured summary of the following content.
 
 FORMAT STRICTLY:
 
@@ -64,7 +64,17 @@ RULES:
 - Do NOT write long paragraphs
 
 Content:
-{partials}
+{content_to_analyze}
 
 Final Output:
 """
+
+    messages = [
+        {"role": "system", "content": "You are a helpful document analyzer."},
+        {"role": "user", "content": prompt}
+    ]
+
+    try:
+        return chat_completion(messages, model_choice)
+    except Exception as e:
+        return f"Error analyzing file: {str(e)}"
