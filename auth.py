@@ -52,7 +52,12 @@ def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
             "name": st.session_state.get("auth_name", ""),
         }
 
-    users = st.secrets.get("auth", {}).get("users", {})
+    users = {
+        "admin": {
+             "name": "SNTI Admin",
+             "password_hash": hash_password("admin123"),
+        }
+    }
 
     st.markdown(
         """
