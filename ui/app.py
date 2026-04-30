@@ -225,18 +225,20 @@ button[kind="header"],
     align-items: center; padding: 16px 0; gap: 6px;
     z-index: 999;
 }
-.nav-icon {
+.nav-icon, a.nav-icon {
     width: 40px; height: 40px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
     font-size: 18px; cursor: pointer; color: var(--text-dim);
     transition: all 0.2s; text-decoration: none;
+    background: transparent;
 }
-.nav-icon:hover {
+.nav-icon:hover, a.nav-icon:hover {
     background: var(--bg-hover);
     color: var(--accent);
     box-shadow: 0 0 8px var(--glow);
+    text-decoration: none;
 }
-.nav-icon.active { background: var(--accent); color: #000; }
+.nav-icon.active, a.nav-icon.active { background: var(--accent) !important; color: #000 !important; }
 
 /* ── WELCOME CARD ── */
 .welcome-card {
@@ -421,7 +423,24 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
     height: 36px !important;
 }
 </style>
+""", unsafe_allow_html=True)
 
+# ---------- URL QUERY PARAMS & SESSION ----------
+query_params = st.query_params
+if "page" in query_params:
+    st.session_state.page = query_params["page"]
+    st.query_params.clear()
+
+if "page" not in st.session_state:
+    st.session_state.page = "Chat"
+
+current_page = st.session_state.page
+
+# Helper for active class
+def active(page): return "active" if current_page == page else ""
+
+# ---------- HEADER HTML ----------
+st.markdown("""
 <!-- TOP HEADER -->
 <div class="tda-header">
   <div class="tda-header-left">
@@ -446,9 +465,9 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 
 <!-- LEFT ICON SIDEBAR -->
 <div class="tda-sidebar">
-  <div class="nav-icon" title="Chat">💬</div>
-  <div class="nav-icon" title="Charts">📊</div>
-  <div class="nav-icon" title="Search">🔍</div>
+  <a href="?page=Chat" class="nav-icon {active('Chat')}" title="Chat">💬</a>
+  <a href="?page=Charts" class="nav-icon {active('Charts')}" title="Charts">📊</a>
+  <a href="?page=Search" class="nav-icon {active('Search')}" title="Search">🔍</a>
   <div class="nav-icon" title="Images">🖼️</div>
   <div class="nav-icon" title="Research">🧠</div>
   <div class="nav-icon" title="Codex">💻</div>
@@ -466,12 +485,9 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
   <div class="t-spacer"></div>
   <div class="t-plan">Plan &nbsp;&#8594;</div>
 </div>
-""", unsafe_allow_html=True)
+""".format(active=active), unsafe_allow_html=True)
 
 # ---------- SESSION ----------
-if "page" not in st.session_state:
-    st.session_state.page = "Chat"
-
 if "chats" not in st.session_state:
     st.session_state.chats = {"Chat 1": []}
 
