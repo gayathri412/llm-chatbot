@@ -561,9 +561,10 @@ if page == "Chat":
         st.chat_message("user").write(user_input)
 
         with st.spinner("Thinking..."):
-            # 👉 PASS FILE CONTENT IF EXISTS
+            # 👉 PASS FILE CONTENT + USER QUESTION IF BOTH EXIST
             if file_text:
-                response = answer_query(file_text, model_choice)
+                combined_query = f"{user_input}\n\nFile content:\n{file_text}"
+                response = answer_query(combined_query, model_choice)
             else:
                 response = answer_query(user_input, model_choice)
 
