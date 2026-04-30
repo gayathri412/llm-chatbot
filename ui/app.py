@@ -11,6 +11,10 @@ from app.orchestrator import answer_query
 
 
 st.set_page_config(page_title="SNTI AI Assistant", page_icon="🤖", layout="wide")
+from auth import require_login, logout_link
+
+current_user = require_login("SNTI AI Assistant")
+
 
 # ---------- GLOBAL ----------
 if "history" not in st.session_state:
@@ -459,7 +463,7 @@ st.markdown(f"""
     <span class="tda-badge">Gemini</span>
     <div class="tda-icon-btn">🔖</div>
     <div class="tda-icon-btn">🔔</div>
-    <div class="tda-avatar">S</div>
+    {logout_link()}
   </div>
 </div>
 
