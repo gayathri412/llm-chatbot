@@ -111,7 +111,7 @@ button[kind="header"],
 /* Uploaded filename pill — shows above the input bar */
 [data-testid="stFileUploaderFile"] {
     position: fixed !important;
-    bottom: 65px !important;
+    bottom: 110px !important;
     right: 80px !important;
     background: #e8f0fe !important;
     border-radius: 20px !important;
@@ -119,7 +119,7 @@ button[kind="header"],
     font-size: 12px !important;
     color: #003087 !important;
     font-weight: 500 !important;
-    z-index: 1100 !important;
+    z-index: 100 !important;
     border: 1px solid #b3d0f0 !important;
     max-width: 220px !important;
     overflow: hidden !important;
