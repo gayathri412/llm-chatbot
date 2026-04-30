@@ -43,12 +43,12 @@ button[kind="header"],
 /* Hide the top nav emoji-button row we injected */
 [data-testid="stHorizontalBlock"]:first-of-type { display: none !important; }
 
-/* ── FILE UPLOADER — 📎 icon pinned RIGHT beside the send arrow ── */
+/* ── FILE UPLOADER — overlaid on the + button in bottom toolbar ── */
 [data-testid="stFileUploader"] {
     position: fixed !important;
-    bottom: 13px !important;
-    right: 37px !important;   /* sits just LEFT of the arrow send button */
-    left: auto !important;
+    bottom: 8px !important;
+    left: 68px !important;    /* over the + button */
+    right: auto !important;
     z-index: 1100 !important;
     width: 38px !important;
     height: 38px !important;
@@ -252,13 +252,13 @@ button[kind="header"],
     color: var(--text-primary) !important;
 }
 
-/* ── BOTTOM INPUT BAR (stChatInput) ── */
+/* ── BOTTOM INPUT BAR (stChatInput) — sits ABOVE the toolbar ── */
 [data-testid="stChatInput"] {
-    position: fixed !important; bottom: 0 !important;
+    position: fixed !important; bottom: 46px !important;
     left: 54px !important; right: 0 !important;
     background: var(--bg-surface) !important;
-    padding: 10px 32px 14px !important;
-    border-top: 1px solid var(--border) !important;
+    padding: 10px 32px 8px !important;
+    border-top: none !important;
     z-index: 1000;
 }
 [data-testid="stChatInput"] > div {
@@ -347,7 +347,62 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* Push page content above pinned input */
-.main .block-container { padding-bottom: 100px !important; padding-top: 10px !important; }
+.main .block-container { padding-bottom: 130px !important; padding-top: 10px !important; }
+
+/* ── BOTTOM TOOLBAR STRIP ── */
+.snti-toolbar {
+    position: fixed;
+    bottom: 0; left: 54px; right: 0;
+    height: 46px;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 20px 0 16px;
+    z-index: 1001;
+    gap: 8px;
+}
+.t-plus {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 20px; font-weight: 300;
+    cursor: pointer; transition: all 0.2s;
+    border: 1px solid var(--border); background: var(--bg-card);
+    flex-shrink: 0;
+}
+.t-plus:hover { background: var(--bg-hover); color: var(--accent); border-color: var(--accent); }
+.t-model {
+    display: flex; align-items: center; gap: 6px;
+    color: var(--text-muted); font-size: 13px; font-weight: 500;
+    padding: 5px 10px; border-radius: 8px; cursor: pointer;
+    transition: all 0.2s; user-select: none;
+}
+.t-model:hover { background: var(--bg-hover); color: var(--text-primary); }
+.t-model .t-chevron { font-size: 9px; opacity: 0.6; }
+.t-sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
+.t-spacer { flex: 1; }
+.t-plan {
+    display: flex; align-items: center; gap: 6px;
+    background: linear-gradient(135deg, #0077b6, #00c2ff);
+    color: #000; font-size: 13px; font-weight: 700;
+    padding: 6px 16px; border-radius: 20px;
+    cursor: pointer; transition: all 0.2s;
+    white-space: nowrap;
+}
+.t-plan:hover { opacity: 0.85; transform: scale(1.02); }
+
+/* Model selectbox — overlaid on .t-model area, transparent */
+[data-testid="stSelectbox"] {
+    position: fixed !important;
+    bottom: 5px !important;
+    left: 112px !important;
+    z-index: 1102 !important;
+    width: 180px !important;
+    opacity: 0 !important;     /* invisible but clickable */
+    height: 36px !important;
+}
+[data-testid="stSelectbox"] > div {
+    height: 36px !important;
+}
 </style>
 
 <!-- TOP HEADER -->
@@ -381,6 +436,18 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
   <div class="nav-icon" title="Research">🧠</div>
   <div class="nav-icon" title="Codex">💻</div>
   <div class="nav-icon" title="GPTs">🤖</div>
+</div>
+
+<!-- BOTTOM TOOLBAR -->
+<div class="snti-toolbar" id="snti-toolbar">
+  <div class="t-plus" title="Upload file">+</div>
+  <div class="t-sep"></div>
+  <div class="t-model" title="Switch model" id="t-model-label">
+    <span id="t-model-name">Llama</span>
+    <span class="t-chevron">&#9650;</span>
+  </div>
+  <div class="t-spacer"></div>
+  <div class="t-plan">Plan &nbsp;&#8594;</div>
 </div>
 """, unsafe_allow_html=True)
 
