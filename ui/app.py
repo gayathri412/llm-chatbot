@@ -10,27 +10,235 @@ import streamlit as st
 from app.orchestrator import answer_query
 
 
-st.set_page_config(page_title="AI Assistant", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="SNTI AI Assistant", page_icon="🤖", layout="wide")
 
 # ---------- GLOBAL ----------
-import streamlit as st
-
 if "history" not in st.session_state:
     st.session_state.history = []
 
 if "global_history" not in st.session_state:
     st.session_state.global_history = []
 
-# ---------- UI STYLE ----------
+# ---------- PREMIUM TDA-STYLE UI ----------
 st.markdown("""
 <style>
-.stButton button {border-radius: 10px;}
-.stTextInput input {border-radius: 10px;}
-</style>
-""", unsafe_allow_html=True)
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-# ---------- CONFIG ----------
-st.set_page_config(page_title="SNTI Model", layout="wide")
+* { font-family: 'Inter', sans-serif; box-sizing: border-box; }
+
+/* Hide default Streamlit chrome */
+#MainMenu, footer, header { visibility: hidden; }
+[data-testid="stSidebar"] { display: none; }
+[data-testid="collapsedControl"] { display: none; }
+
+/* Full viewport body */
+.stApp { background: #f0f2f5; }
+
+/* ── TOP HEADER BAR ── */
+.tda-header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+    height: 58px;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e5ea;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
+.tda-header-left { display: flex; align-items: center; gap: 14px; }
+.tda-header-left .hamburger { font-size: 20px; color: #555; cursor: pointer; }
+.tda-header-left .chat-icon { font-size: 20px; color: #555; cursor: pointer; }
+.tda-logo-text {
+    font-size: 17px; font-weight: 700; color: #003087;
+    letter-spacing: 0.5px;
+}
+.tda-logo-text span { color: #e63946; }
+.tda-header-center img { height: 36px; }
+.tda-header-center {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center;
+}
+.tda-header-center .center-logo {
+    font-size: 15px; font-weight: 700; color: #003087;
+    border: 2px solid #003087; padding: 3px 10px; border-radius: 4px;
+    letter-spacing: 1px;
+}
+.tda-header-center .center-sub {
+    font-size: 8px; color: #0077b6; letter-spacing: 2px;
+    text-align: center; display: block;
+}
+.tda-header-right { display: flex; align-items: center; gap: 10px; }
+.tda-badge {
+    background: linear-gradient(135deg, #0077b6, #00b4d8);
+    color: white; font-size: 11px; font-weight: 600;
+    padding: 3px 10px; border-radius: 12px; letter-spacing: 0.5px;
+}
+.tda-icon-btn {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; cursor: pointer; color: #555;
+    transition: background 0.2s;
+}
+.tda-icon-btn:hover { background: #f0f2f5; }
+.tda-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, #003087, #0077b6);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 13px;
+}
+
+/* ── LEFT ICON SIDEBAR ── */
+.tda-sidebar {
+    position: fixed; left: 0; top: 58px; bottom: 0; width: 54px;
+    background: #ffffff;
+    border-right: 1px solid #e2e5ea;
+    display: flex; flex-direction: column;
+    align-items: center; padding: 16px 0; gap: 6px;
+    z-index: 999;
+}
+.nav-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer; color: #666;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+.nav-icon:hover { background: #e8f0fe; color: #003087; }
+.nav-icon.active { background: #003087; color: white; }
+
+/* ── MAIN CONTENT AREA ── */
+.tda-main {
+    margin-left: 54px;
+    margin-top: 58px;
+    padding: 24px 32px;
+    min-height: calc(100vh - 58px);
+}
+
+/* ── WELCOME CARD ── */
+.welcome-card {
+    background: #ffffff;
+    border: 1px solid #e2e5ea;
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    max-width: 800px;
+}
+.welcome-card .bot-name {
+    font-size: 15px; font-weight: 700; color: #003087;
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.welcome-card p { color: #444; font-size: 14px; line-height: 1.6; margin: 0; }
+.welcome-card .show-more {
+    color: #0077b6; font-size: 13px; cursor: pointer;
+    text-decoration: underline; margin-top: 6px; display: inline-block;
+}
+
+/* ── CHAT MESSAGES ── */
+.chat-wrap { max-width: 800px; }
+
+/* ── BOTTOM INPUT BAR ── */
+.tda-input-bar {
+    position: fixed; bottom: 0; left: 54px; right: 0;
+    background: #ffffff;
+    border-top: 1px solid #e2e5ea;
+    padding: 12px 32px 16px;
+    z-index: 999;
+}
+.tda-input-inner {
+    max-width: 800px;
+    background: #f6f8fa;
+    border: 1px solid #d0d5dd;
+    border-radius: 14px;
+    display: flex; align-items: center;
+    padding: 8px 14px; gap: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.tda-input-inner:focus-within {
+    border-color: #0077b6;
+    box-shadow: 0 0 0 3px rgba(0,119,182,0.12);
+}
+.tda-input-icon { font-size: 18px; color: #888; cursor: pointer; flex-shrink: 0; }
+.tda-input-icon:hover { color: #003087; }
+.tda-send-btn {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, #003087, #0077b6);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 16px; cursor: pointer; flex-shrink: 0;
+    transition: transform 0.15s, opacity 0.15s;
+}
+.tda-send-btn:hover { transform: scale(1.08); opacity: 0.9; }
+.tda-footer-note {
+    text-align: center; font-size: 11px; color: #aaa;
+    margin-top: 8px; max-width: 800px;
+}
+
+/* Shift Streamlit chat input into our bar area */
+[data-testid="stChatInput"] {
+    position: fixed !important; bottom: 0 !important;
+    left: 54px !important; right: 0 !important;
+    background: transparent !important;
+    padding: 10px 32px 14px !important;
+    border-top: 1px solid #e2e5ea;
+    z-index: 1000;
+}
+[data-testid="stChatInput"] > div {
+    max-width: 800px;
+    background: #f6f8fa;
+    border: 1px solid #d0d5dd;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+[data-testid="stChatInput"] textarea {
+    background: transparent !important;
+}
+
+/* Push page content above pinned input */
+.main .block-container { padding-bottom: 100px !important; padding-top: 10px !important; }
+
+/* Streamlit button style */
+.stButton button {
+    border-radius: 10px;
+    border: 1px solid #d0d5dd;
+    background: #fff;
+    transition: all 0.2s;
+}
+.stButton button:hover { background: #e8f0fe; border-color: #0077b6; }
+</style>
+
+<!-- TOP HEADER -->
+<div class="tda-header">
+  <div class="tda-header-left">
+    <span class="hamburger">☰</span>
+    <span class="chat-icon">💬</span>
+    <span class="tda-logo-text"><span>SNTI</span> AI</span>
+  </div>
+  <div class="tda-header-center">
+    <div style="text-align:center">
+      <div class="center-logo">SNTI AI</div>
+      <div class="center-sub">DIGITAL ASSISTANT</div>
+    </div>
+  </div>
+  <div class="tda-header-right">
+    <span style="font-size:12px;color:#666;">GPT</span>
+    <span class="tda-badge">Gemini</span>
+    <div class="tda-icon-btn">🔖</div>
+    <div class="tda-icon-btn">🔔</div>
+    <div class="tda-avatar">S</div>
+  </div>
+</div>
+
+<!-- LEFT ICON SIDEBAR -->
+<div class="tda-sidebar">
+  <div class="nav-icon" title="Chat">💬</div>
+  <div class="nav-icon" title="Charts">📊</div>
+  <div class="nav-icon" title="Search">🔍</div>
+  <div class="nav-icon" title="Images">🖼️</div>
+  <div class="nav-icon" title="Research">🧠</div>
+  <div class="nav-icon" title="Codex">💻</div>
+  <div class="nav-icon" title="GPTs">🤖</div>
+</div>
+""", unsafe_allow_html=True)
 
 # ---------- SESSION ----------
 if "page" not in st.session_state:
@@ -42,40 +250,28 @@ if "chats" not in st.session_state:
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = "Chat 1"
 
-# ---------- SIDEBAR ----------
-st.sidebar.title("💬 SNTI")
+# ---------- TOP NAV BUTTONS (replace sidebar) ----------
+st.markdown('<div style="margin-top:12px;"></div>', unsafe_allow_html=True)
 
-if st.sidebar.button("➕ New Chat"):
-    name = f"Chat {len(st.session_state.chats)+1}"
-    st.session_state.chats[name] = []
-    st.session_state.current_chat = name
-    st.session_state.page = "Chat"
-
-if st.sidebar.button("🔍 Search"):
-    st.session_state.page = "Search"
-
-if st.sidebar.button("📊 Charts"):
-    st.session_state.page = "Charts"
-
-if st.sidebar.button("🖼️ Images"):
-    st.session_state.page = "Images"
-
-if st.sidebar.button("📱 Apps"):
-    st.session_state.page = "Apps"
-
-if st.sidebar.button("🧠 Research"):
-    st.session_state.page = "Research"
-
-if st.sidebar.button("💻 Codex"):
-    st.session_state.page = "Codex"
-
-if st.sidebar.button("🤖 GPTs"):
-    st.session_state.page = "GPTs"
-
-col1, col2 = st.columns([6,1])
-
-with col2:
-    model_choice = st.selectbox("Model", ["Llama", "Gemini"])
+nav_cols = st.columns([1,1,1,1,1,1,1,1,3])
+with nav_cols[0]:
+    if st.button("💬", help="Chat", key="nav_chat"):        st.session_state.page = "Chat"
+with nav_cols[1]:
+    if st.button("🔍", help="Search", key="nav_search"):   st.session_state.page = "Search"
+with nav_cols[2]:
+    if st.button("📊", help="Charts", key="nav_charts"):   st.session_state.page = "Charts"
+with nav_cols[3]:
+    if st.button("🖼️", help="Images", key="nav_images"):   st.session_state.page = "Images"
+with nav_cols[4]:
+    if st.button("📱", help="Apps", key="nav_apps"):        st.session_state.page = "Apps"
+with nav_cols[5]:
+    if st.button("🧠", help="Research", key="nav_research"): st.session_state.page = "Research"
+with nav_cols[6]:
+    if st.button("💻", help="Codex", key="nav_codex"):     st.session_state.page = "Codex"
+with nav_cols[7]:
+    if st.button("🤖", help="GPTs", key="nav_gpts"):       st.session_state.page = "GPTs"
+with nav_cols[8]:
+    model_choice = st.selectbox("Model", ["Llama", "Gemini"], label_visibility="collapsed")
 
 # ---------- PAGE ROUTING ----------
 page = st.session_state.page
@@ -112,13 +308,15 @@ if page == "Chat":
 
         st.success("File uploaded successfully ✅")
 
-    # ---------- HOME SCREEN ----------
+    # ---------- WELCOME CARD (shown on fresh chat) ----------
     if not chat_history:
         st.markdown(
             f"""
-            <div style='text-align:center; margin-top:150px;'>
-                <h1 style='font-size:40px;'>🤖 {model_choice}</h1>
-                <p style='font-size:18px; color:#888;'>What can I help you with?</p>
+            <div class="welcome-card">
+              <div class="bot-name">🤖 &nbsp; SNTI Digital Assistant</div>
+              <p>Hello! Welcome to <strong>SNTI AI</strong> — your intelligent digital assistant.<br>
+              I'm here to help you with research, data analysis, coding, image generation and more.<br>
+              <span class="show-more">Tell me what you need →</span></p>
             </div>
             """,
             unsafe_allow_html=True
