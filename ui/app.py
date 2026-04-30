@@ -364,7 +364,7 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* Push page content above pinned input */
-.main .block-container { padding-bottom: 130px !important; padding-top: 10px !important; }
+.main .block-container { padding-bottom: 200px !important; padding-top: 10px !important; }
 
 /* ── BOTTOM TOOLBAR STRIP ── */
 .snti-toolbar {
