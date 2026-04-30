@@ -643,122 +643,218 @@ elif page == "Charts":
         if file.name.endswith(".csv"):
             df = pd.read_csv(file)
             df = df.loc[:, ~df.columns.duplicated()]
-
-            st.write("### 📄 Data Preview")
-            st.dataframe(df.head())
-
-            # --------- EXPLAIN ----------
-            st.write("### 🤖 Data Explanation")
             summary = df.describe(include='all').to_string()
 
-            explanation = answer_query(
-                f"Explain this dataset:\n{summary}",
-                model_choice
-            )
-            st.write(explanation)
+            # Create tabs for organized sections
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(["📄 Data", "📊 Graphs", "📈 Analysis", "🔮 Prediction", "📥 Download"])
 
-            # --------- SELECT ----------
-            cols = df.columns.tolist()
-            x_col = st.selectbox("X-axis", cols)
-            y_col = st.selectbox("Y-axis", cols)
+            with tab1:
+                st.write("### Data Preview")
+                st.dataframe(df.head(20))
+                st.write(f"**Shape:** {df.shape[0]} rows × {df.shape[1]} columns")
+                st.write("### Statistical Summary")
+                st.dataframe(df.describe())
 
-            if x_col != y_col:
-                df[y_col] = pd.to_numeric(df[y_col], errors='coerce')
-                chart_data = df[[x_col, y_col]].dropna()
+            with tab2:
+                st.write("### Graphs & Visualizations")
+                cols = df.columns.tolist()
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    x_col = st.selectbox("X-axis", cols, key="graph_x")
+                with col2:
+                    y_col = st.selectbox("Y-axis", cols, key="graph_y")
 
-                if not chart_data.empty:
-                    st.write("### 📊 Visualization")
+                if x_col != y_col:
+                    df[y_col] = pd.to_numeric(df[y_col], errors='coerce')
+                    chart_data = df[[x_col, y_col]].dropna()
 
-                    chart_type = st.selectbox(
-                        "Chart Type",
-                        ["Line", "Bar", "Scatter", "Histogram", "Pie"]
-                    )
+                    if not chart_data.empty:
+                        chart_type = st.selectbox(
+                            "Chart Type",
+                            ["Line", "Bar", "Scatter", "Histogram", "Pie", "Area"],
+                            key="chart_type"
+                        )
 
-                    if chart_type == "Line":
-                        st.line_chart(chart_data, x=x_col, y=y_col)
+                        fig, ax = plt.subplots(figsize=(10, 6))
 
-                    elif chart_type == "Bar":
-                        st.bar_chart(chart_data, x=x_col, y=y_col)
+                        if chart_type == "Line":
+                            ax.plot(chart_data[x_col], chart_data[y_col], marker='o', linewidth=2)
+                            ax.set_xlabel(x_col)
+                            ax.set_ylabel(y_col)
+                            ax.set_title(f"{y_col} vs {x_col} - Line Chart")
+                            st.pyplot(fig)
 
-                    elif chart_type == "Scatter":
-                        fig, ax = plt.subplots()
-                        ax.scatter(chart_data[x_col], chart_data[y_col])
-                        ax.set_xlabel(x_col)
-                        ax.set_ylabel(y_col)
-                        st.pyplot(fig)
+                        elif chart_type == "Bar":
+                            ax.bar(chart_data[x_col], chart_data[y_col])
+                            ax.set_xlabel(x_col)
+                            ax.set_ylabel(y_col)
+                            ax.set_title(f"{y_col} vs {x_col} - Bar Chart")
+                            st.pyplot(fig)
 
-                    elif chart_type == "Histogram":
-                        fig, ax = plt.subplots()
-                        ax.hist(chart_data[y_col], bins=20, edgecolor='black')
-                        ax.set_xlabel(y_col)
-                        ax.set_ylabel("Frequency")
-                        st.pyplot(fig)
+                        elif chart_type == "Area":
+                            ax.fill_between(chart_data[x_col], chart_data[y_col], alpha=0.6)
+                            ax.set_xlabel(x_col)
+                            ax.set_ylabel(y_col)
+                            ax.set_title(f"{y_col} vs {x_col} - Area Chart")
+                            st.pyplot(fig)
 
-                    elif chart_type == "Pie":
-                        # Pie chart works best with categorical x and numeric y
-                        fig, ax = plt.subplots()
-                        pie_data = chart_data.groupby(x_col)[y_col].sum().reset_index()
-                        ax.pie(pie_data[y_col], labels=pie_data[x_col], autopct='%1.1f%%')
-                        st.pyplot(fig)
+                        elif chart_type == "Scatter":
+                            ax.scatter(chart_data[x_col], chart_data[y_col], s=50, alpha=0.7)
+                            ax.set_xlabel(x_col)
+                            ax.set_ylabel(y_col)
+                            ax.set_title(f"{y_col} vs {x_col} - Scatter Plot")
+                            st.pyplot(fig)
 
-                    # --------- ANALYSIS ----------
-                    st.write("### 📊 Analysis")
+                        elif chart_type == "Histogram":
+                            ax.hist(chart_data[y_col], bins=20, edgecolor='black', alpha=0.7)
+                            ax.set_xlabel(y_col)
+                            ax.set_ylabel("Frequency")
+                            ax.set_title(f"Distribution of {y_col}")
+                            st.pyplot(fig)
 
-                    analysis = answer_query(
-                        f"Analyze trends:\n{summary}",
-                        model_choice
-                    )
-                    st.write(analysis)
+                        elif chart_type == "Pie":
+                            pie_data = chart_data.groupby(x_col)[y_col].sum().reset_index()
+                            fig, ax = plt.subplots(figsize=(8, 8))
+                            ax.pie(pie_data[y_col], labels=pie_data[x_col], autopct='%1.1f%%', startangle=90)
+                            ax.set_title(f"{y_col} by {x_col} - Pie Chart")
+                            st.pyplot(fig)
+                    else:
+                        st.warning("No numeric data available for the selected columns")
+                else:
+                    st.info("Please select different columns for X and Y axes")
 
-                    # --------- PREDICTION ----------
-                    st.write("### 🔮 Prediction")
+            with tab3:
+                st.write("### AI Data Analysis")
+                if st.button("🤖 Generate Analysis", key="analysis_btn"):
+                    with st.spinner("Analyzing data..."):
+                        analysis = answer_query(
+                            f"Analyze this dataset in detail. Provide insights on trends, patterns, correlations, and key statistics:\n{summary}",
+                            model_choice
+                        )
+                        st.session_state.analysis_result = analysis
+                
+                if 'analysis_result' in st.session_state:
+                    st.write(st.session_state.analysis_result)
 
-                    X = np.arange(len(chart_data)).reshape(-1, 1)
-                    y = chart_data[y_col].values
+            with tab4:
+                st.write("### Future Prediction")
+                pred_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+                
+                if len(pred_cols) > 0:
+                    pred_col = st.selectbox("Select column to predict", pred_cols, key="pred_col")
+                    
+                    if st.button("🔮 Generate Prediction", key="pred_btn"):
+                        with st.spinner("Training model and predicting..."):
+                            chart_data = df[[pred_col]].dropna().reset_index(drop=True)
+                            
+                            if len(chart_data) > 1:
+                                X = np.arange(len(chart_data)).reshape(-1, 1)
+                                y = chart_data[pred_col].values
 
-                    model = LinearRegression()
-                    model.fit(X, y)
+                                model = LinearRegression()
+                                model.fit(X, y)
 
-                    future = np.arange(len(X), len(X)+5).reshape(-1, 1)
-                    pred = model.predict(future)
+                                # Predict next 10 steps
+                                future_steps = 10
+                                future = np.arange(len(X), len(X) + future_steps).reshape(-1, 1)
+                                pred = model.predict(future)
 
-                    st.write(pred)
+                                # Create prediction dataframe
+                                pred_df = pd.DataFrame({
+                                    "Step": list(range(len(y) + len(pred))),
+                                    "Type": ["Historical"] * len(y) + ["Predicted"] * len(pred),
+                                    pred_col: np.concatenate([y, pred])
+                                })
 
-                    pred_df = pd.DataFrame({
-                        "Index": list(range(len(y) + len(pred))),
-                        "Value": np.concatenate([y, pred])
-                    })
+                                st.write("#### Prediction Results")
+                                st.dataframe(pred_df.tail(future_steps))
 
-                    st.line_chart(pred_df, x="Index", y="Value")
+                                # Plot prediction
+                                fig, ax = plt.subplots(figsize=(12, 6))
+                                ax.plot(pred_df[pred_df["Type"] == "Historical"]["Step"], 
+                                       pred_df[pred_df["Type"] == "Historical"][pred_col], 
+                                       label="Historical", marker='o', linewidth=2)
+                                ax.plot(pred_df[pred_df["Type"] == "Predicted"]["Step"], 
+                                       pred_df[pred_df["Type"] == "Predicted"][pred_col], 
+                                       label="Predicted", marker='x', linestyle='--', linewidth=2, color='red')
+                                ax.set_xlabel("Step")
+                                ax.set_ylabel(pred_col)
+                                ax.set_title(f"{pred_col} - Historical vs Predicted")
+                                ax.legend()
+                                ax.grid(True, alpha=0.3)
+                                st.pyplot(fig)
 
-                    # --------- PDF DOWNLOAD ----------
-                    report = f"""
-                    Explanation:
-                    {explanation}
+                                # Store for download
+                                st.session_state.prediction_result = pred_df.to_string()
+                                st.session_state.prediction_plot = fig
+                            else:
+                                st.error("Not enough data points for prediction")
+                else:
+                    st.warning("No numeric columns available for prediction")
 
-                    Analysis:
-                    {analysis}
+            with tab5:
+                st.write("### Download Complete Report")
+                
+                # Generate explanation if not exists
+                if st.button("📋 Generate Report", key="report_btn"):
+                    with st.spinner("Generating comprehensive report..."):
+                        explanation = answer_query(f"Explain this dataset:\n{summary}", model_choice)
+                        st.session_state.explanation = explanation
+                        
+                        analysis = answer_query(f"Analyze this dataset:\n{summary}", model_choice)
+                        st.session_state.analysis_result = analysis
 
-                    Prediction:
-                    {pred}
-                    """
-
+                # Create comprehensive PDF
+                if st.button("📥 Download PDF Report", key="download_btn"):
                     buffer = io.BytesIO()
-                    doc = SimpleDocTemplate(buffer)
+                    doc = SimpleDocTemplate(buffer, pagesize=(612, 792))
+                    
+                    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                    styles = getSampleStyleSheet()
+                    
+                    # Custom style for better wrapping
+                    body_style = ParagraphStyle(
+                        'BodyText',
+                        parent=styles['Normal'],
+                        fontSize=10,
+                        leading=14,
+                        spaceAfter=12
+                    )
 
                     content = [
-                        Paragraph("CSV Report", styles["Title"]),
-                        Spacer(1, 12),
-                        Paragraph(report, styles["Normal"])
+                        Paragraph("<b>Data Analysis Report</b>", styles["Title"]),
+                        Spacer(1, 20),
+                        Paragraph(f"<b>File:</b> {file.name}", styles["Normal"]),
+                        Paragraph(f"<b>Rows:</b> {df.shape[0]} | <b>Columns:</b> {df.shape[1]}", styles["Normal"]),
+                        Spacer(1, 20),
                     ]
+
+                    # Add Explanation
+                    if 'explanation' in st.session_state:
+                        content.append(Paragraph("<b>Data Explanation</b>", styles["Heading2"]))
+                        content.append(Paragraph(st.session_state.explanation.replace('\n', '<br/>'), body_style))
+                        content.append(Spacer(1, 12))
+
+                    # Add Analysis
+                    if 'analysis_result' in st.session_state:
+                        content.append(Paragraph("<b>Analysis</b>", styles["Heading2"]))
+                        content.append(Paragraph(st.session_state.analysis_result.replace('\n', '<br/>'), body_style))
+                        content.append(Spacer(1, 12))
+
+                    # Add Prediction
+                    if 'prediction_result' in st.session_state:
+                        content.append(Paragraph("<b>Prediction</b>", styles["Heading2"]))
+                        content.append(Paragraph(st.session_state.prediction_result.replace('\n', '<br/>'), body_style))
 
                     doc.build(content)
 
                     st.download_button(
-                        "📥 Download Report",
+                        "⬇️ Click to Download",
                         buffer.getvalue(),
-                        "csv_report.pdf",
-                        "application/pdf"
+                        f"{file.name}_analysis_report.pdf",
+                        "application/pdf",
+                        key="final_download"
                     )
 
         # ================= PDF =================
