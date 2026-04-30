@@ -28,8 +28,69 @@ st.markdown("""
 
 /* Hide default Streamlit chrome */
 #MainMenu, footer, header { visibility: hidden; }
-[data-testid="stSidebar"] { display: none; }
-[data-testid="collapsedControl"] { display: none; }
+
+/* Aggressively hide native Streamlit sidebar and its toggle */
+section[data-testid="stSidebar"],
+[data-testid="stSidebar"],
+[data-testid="collapsedControl"],
+button[kind="header"],
+.css-1lcbmhc, .css-17ziqus, .css-1d391kg {
+    display: none !important;
+    width: 0 !important;
+    visibility: hidden !important;
+}
+
+/* Hide the top nav emoji-button row we injected */
+[data-testid="stHorizontalBlock"]:first-of-type { display: none !important; }
+
+/* File uploader — compact inline style next to chat input */
+[data-testid="stFileUploader"] {
+    position: fixed !important;
+    bottom: 14px !important;
+    left: 74px !important;
+    z-index: 1100 !important;
+    width: auto !important;
+}
+[data-testid="stFileUploader"] section {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    min-height: unset !important;
+}
+[data-testid="stFileUploader"] label { display: none !important; }
+[data-testid="stFileUploaderDropzone"] {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    min-height: unset !important;
+}
+[data-testid="stFileUploaderDropzoneInstructions"] { display: none !important; }
+[data-testid="stFileUploader"] button {
+    background: transparent !important;
+    border: none !important;
+    font-size: 22px !important;
+    color: #555 !important;
+    padding: 4px 6px !important;
+    cursor: pointer !important;
+    line-height: 1 !important;
+    border-radius: 8px !important;
+    transition: background 0.2s !important;
+}
+[data-testid="stFileUploader"] button:hover {
+    background: #e8f0fe !important;
+    color: #003087 !important;
+}
+/* Uploaded file name pill */
+[data-testid="stFileUploaderFile"] {
+    position: fixed !important;
+    bottom: 70px !important;
+    left: 74px !important;
+    background: #e8f0fe !important;
+    border-radius: 8px !important;
+    padding: 4px 10px !important;
+    font-size: 12px !important;
+    z-index: 1100 !important;
+}
 
 /* Full viewport body */
 .stApp { background: #f0f2f5; }
@@ -250,28 +311,11 @@ if "chats" not in st.session_state:
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = "Chat 1"
 
-# ---------- TOP NAV BUTTONS (replace sidebar) ----------
-st.markdown('<div style="margin-top:12px;"></div>', unsafe_allow_html=True)
-
-nav_cols = st.columns([1,1,1,1,1,1,1,1,3])
-with nav_cols[0]:
-    if st.button("💬", help="Chat", key="nav_chat"):        st.session_state.page = "Chat"
-with nav_cols[1]:
-    if st.button("🔍", help="Search", key="nav_search"):   st.session_state.page = "Search"
-with nav_cols[2]:
-    if st.button("📊", help="Charts", key="nav_charts"):   st.session_state.page = "Charts"
-with nav_cols[3]:
-    if st.button("🖼️", help="Images", key="nav_images"):   st.session_state.page = "Images"
-with nav_cols[4]:
-    if st.button("📱", help="Apps", key="nav_apps"):        st.session_state.page = "Apps"
-with nav_cols[5]:
-    if st.button("🧠", help="Research", key="nav_research"): st.session_state.page = "Research"
-with nav_cols[6]:
-    if st.button("💻", help="Codex", key="nav_codex"):     st.session_state.page = "Codex"
-with nav_cols[7]:
-    if st.button("🤖", help="GPTs", key="nav_gpts"):       st.session_state.page = "GPTs"
-with nav_cols[8]:
-    model_choice = st.selectbox("Model", ["Llama", "Gemini"], label_visibility="collapsed")
+# ---------- NAV STATE (hidden buttons via session_state URL-style) ----------
+# The HTML sidebar icons above are decorative; real nav is via these hidden vars.
+# Model selector pinned to header area
+model_choice = st.selectbox("Model", ["Llama", "Gemini"], label_visibility="collapsed",
+                             key="model_select")
 
 # ---------- PAGE ROUTING ----------
 page = st.session_state.page
@@ -290,23 +334,21 @@ if page == "Chat":
 
     chat_history = st.session_state.chats[st.session_state.current_chat]
 
-    # ---------- FILE UPLOAD (ADD HERE) ----------
-    uploaded_file = st.file_uploader("Upload a file", type=["txt", "pdf"])
+    # ---------- FILE UPLOAD — embedded in bottom bar as 📎 icon ----------
+    uploaded_file = st.file_uploader("📎", type=["txt", "pdf"], label_visibility="collapsed",
+                                      key="chat_file_uploader")
 
     file_text = ""
     if uploaded_file:
         if uploaded_file.type == "text/plain":
             file_text = uploaded_file.read().decode("utf-8")
-
         elif uploaded_file.type == "application/pdf":
             import pdfplumber
             with pdfplumber.open(uploaded_file) as pdf:
-                for page in pdf.pages:
-                    file_text += page.extract_text() or ""
-        
+                for p in pdf.pages:
+                    file_text += p.extract_text() or ""
         file_text = file_text[:5000]
-
-        st.success("File uploaded successfully ✅")
+        st.toast(f"✅ {uploaded_file.name} ready", icon="📎")
 
     # ---------- WELCOME CARD (shown on fresh chat) ----------
     if not chat_history:
