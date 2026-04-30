@@ -1,4 +1,8 @@
-﻿from app.tools import calculator_tool, file_analyzer_tool
+import time
+
+from app.cache import answer_cache
+from app.telemetry import log_chat_event
+from app.tools import calculator_tool, file_analyzer_tool
 from data.rag import format_context, retrieve_context
 from llm.client import chat_completion
 
@@ -49,23 +53,63 @@ calculator OR file OR none
         return "none"
 
 
+def _status_for_response(response):
+    return "error" if str(response).startswith("Error:") else "ok"
+
+
 # MAIN FUNCTION
 def answer_query(query, model_choice="Llama"):
+    started_at = time.perf_counter()
+    telemetry_query = query.split("\n\nFile content:", 1)[0].strip()
+    cache_meta = answer_cache.metadata()
+
+    def duration_ms():
+        return int((time.perf_counter() - started_at) * 1000)
+
+    def emit_event(response, status="ok", tool="none", cache_hit=False, context_items=None, error=""):
+        log_chat_event(
+            query=telemetry_query,
+            model_choice=model_choice,
+            duration_ms=duration_ms(),
+            status=status,
+            tool=tool,
+            cache_hit=cache_hit,
+            cache_backend=cache_meta["backend"],
+            context_items=context_items or [],
+            response=response,
+            error=error,
+        )
+
     if "The user now asks:" in query:
         latest_question = query.split("The user now asks:")[-1].strip()
     else:
         latest_question = query.strip()
 
     if len(query) > 1000:
-        return file_analyzer_tool(query, model_choice)
+        try:
+            response = file_analyzer_tool(query, model_choice)
+            emit_event(response, status=_status_for_response(response), tool="file")
+            return response
+        except Exception as e:
+            response = f"Error: {str(e)}"
+            emit_event(response, status="error", tool="file", error=str(e))
+            return response
 
     tool = decide_tool_llm(latest_question, model_choice)
 
     if tool == "calculator":
-        return calculator_tool(latest_question)
+        response = calculator_tool(latest_question)
+        emit_event(response, status=_status_for_response(response), tool="calculator")
+        return response
 
     retrieved_context = retrieve_context(latest_question)
     context_text = format_context(retrieved_context)
+    cache_key = answer_cache.make_key(latest_question, model_choice, context_text)
+    cached_response = answer_cache.get(cache_key)
+
+    if cached_response:
+        emit_event(cached_response, cache_hit=True, context_items=retrieved_context)
+        return cached_response
 
     final_prompt = f"""
 You are a smart and helpful AI assistant.
@@ -93,6 +137,15 @@ Answer:
     ]
 
     try:
-        return chat_completion(messages, model_choice)
+        response = chat_completion(messages, model_choice)
+        status = _status_for_response(response)
+
+        if status == "ok":
+            answer_cache.set(cache_key, response)
+
+        emit_event(response, status=status, context_items=retrieved_context)
+        return response
     except Exception as e:
-        return f"Error: {str(e)}"
+        response = f"Error: {str(e)}"
+        emit_event(response, status="error", context_items=retrieved_context, error=str(e))
+        return response
