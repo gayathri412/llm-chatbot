@@ -10,9 +10,9 @@ def decide_tool_llm(query, model_choice):
 You are an AI assistant that selects tools.
 
 Available tools:
-1. calculator
-2. file
-3. none
+1. calculator - ONLY for math calculations (e.g., "2+2", "what is 15% of 200", "sqrt(16)")
+2. file - ONLY for analyzing uploaded file content
+3. none - for all general questions, explanations, facts, research
 
 Question: {query}
 

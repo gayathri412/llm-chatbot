@@ -671,7 +671,7 @@ elif page == "Charts":
 
                     chart_type = st.selectbox(
                         "Chart Type",
-                        ["Line", "Bar", "Scatter"]
+                        ["Line", "Bar", "Scatter", "Histogram", "Pie"]
                     )
 
                     if chart_type == "Line":
@@ -683,6 +683,22 @@ elif page == "Charts":
                     elif chart_type == "Scatter":
                         fig, ax = plt.subplots()
                         ax.scatter(chart_data[x_col], chart_data[y_col])
+                        ax.set_xlabel(x_col)
+                        ax.set_ylabel(y_col)
+                        st.pyplot(fig)
+
+                    elif chart_type == "Histogram":
+                        fig, ax = plt.subplots()
+                        ax.hist(chart_data[y_col], bins=20, edgecolor='black')
+                        ax.set_xlabel(y_col)
+                        ax.set_ylabel("Frequency")
+                        st.pyplot(fig)
+
+                    elif chart_type == "Pie":
+                        # Pie chart works best with categorical x and numeric y
+                        fig, ax = plt.subplots()
+                        pie_data = chart_data.groupby(x_col)[y_col].sum().reset_index()
+                        ax.pie(pie_data[y_col], labels=pie_data[x_col], autopct='%1.1f%%')
                         st.pyplot(fig)
 
                     # --------- ANALYSIS ----------
