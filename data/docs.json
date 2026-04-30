@@ -18,5 +18,41 @@
   "id": 99,
   "title": "Gayathri RAG Test",
   "body": "The public RAG verification marker for Gayathri's chatbot system is BLUE-RAG-2026."
+  },
+  {
+  "id": 100,
+  "title": "SNTI AI Assistant",
+  "body": "SNTI AI Assistant is a Streamlit chatbot that supports chat, search, charts, big data, images, apps, research, coding, and custom GPT tools."
+  },
+  {
+  "id": 101,
+  "title": "SNTI Navigation",
+  "body": "The SNTI AI Assistant has pages for Chat, Search, Charts, Big Data, Images, Apps, Research, Codex, and GPTs. Users can switch pages using the left sidebar icons."
+  },
+  {
+  "id": 102,
+  "title": "Supported File Uploads",
+  "body": "The chatbot supports text, PDF, DOCX, CSV, JSON, and image uploads depending on the selected page. Chat supports TXT, PDF, and DOCX files. Charts supports CSV and PDF files. Images supports PNG, JPG, and JPEG files."
+  },
+  {
+  "id": 103,
+  "title": "Authentication",
+  "body": "The SNTI AI Assistant uses a Streamlit login screen. Users must sign in before accessing the app. Authentication is handled by auth.py and user credentials are configured in .streamlit/secrets.toml."
+  },
+  {
+  "id": 104,
+  "title": "RAG Knowledge Base",
+  "body": "The chatbot uses Retrieval-Augmented Generation, also called RAG, to answer questions from local JSON knowledge files. The main knowledge file is data/docs.json."
+  },
+  {
+  "id": 105,
+  "title": "Models",
+  "body": "The SNTI AI Assistant allows users to choose between Llama and Gemini models. Llama responses are generated through Groq, while Gemini responses are generated through Google Generative AI."
   }
+
+
+
+
+
+
 ]
