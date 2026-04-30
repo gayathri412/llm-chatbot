@@ -13,5 +13,10 @@
     "id": 3,
     "title": "Cross Site Scripting",
     "body": "XSS allows attackers to inject malicious scripts into web pages."
+  },
+  {
+  "id": 99,
+  "title": "Gayathri RAG Test",
+  "body": "The secret test code for Gayathri's chatbot RAG system is BLUE-RAG-2026."
   }
 ]
