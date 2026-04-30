@@ -661,9 +661,12 @@ elif page == "Charts":
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    x_col = st.selectbox("X-axis", cols, key="graph_x")
+                    x_default = cols[0] if len(cols) > 0 else None
+                    x_col = st.selectbox("X-axis", cols, index=0, key="graph_x")
                 with col2:
-                    y_col = st.selectbox("Y-axis", cols, key="graph_y")
+                    y_default = cols[1] if len(cols) > 1 else cols[0]
+                    y_index = 1 if len(cols) > 1 else 0
+                    y_col = st.selectbox("Y-axis", cols, index=y_index, key="graph_y")
 
                 if x_col != y_col:
                     df[y_col] = pd.to_numeric(df[y_col], errors='coerce')
