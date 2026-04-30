@@ -119,66 +119,91 @@ button[kind="header"],
     cursor: pointer !important;
 }
 
-/* Full viewport body */
-.stApp { background: #f0f2f5; }
+/* ══════════════════════════════════════════════
+   🌑  DARK THEME  —  SNTI AI
+   ══════════════════════════════════════════════ */
+
+/* CSS Variables — swap these to change the whole theme */
+:root {
+    --bg-base:      #0a0a0a;   /* page background          */
+    --bg-surface:   #141414;   /* header / sidebar         */
+    --bg-card:      #1c1c1c;   /* cards / input box        */
+    --bg-hover:     #252525;   /* hover state              */
+    --border:       #2a2a2a;   /* borders                  */
+    --accent:       #00c2ff;   /* cyan-blue accent         */
+    --accent-dark:  #0077b6;   /* darker accent            */
+    --text-primary: #f0f0f0;   /* main text                */
+    --text-muted:   #888;      /* secondary text           */
+    --text-dim:     #555;      /* dim icons                */
+    --glow:         rgba(0, 194, 255, 0.15);
+}
+
+/* Full page background */
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="block-container"] {
+    background: var(--bg-base) !important;
+    color: var(--text-primary) !important;
+}
 
 /* ── TOP HEADER BAR ── */
 .tda-header {
     position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
     height: 58px;
-    background: #ffffff;
-    border-bottom: 1px solid #e2e5ea;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    box-shadow: 0 2px 16px rgba(0,0,0,0.5);
 }
 .tda-header-left { display: flex; align-items: center; gap: 14px; }
-.tda-header-left .hamburger { font-size: 20px; color: #555; cursor: pointer; }
-.tda-header-left .chat-icon { font-size: 20px; color: #555; cursor: pointer; }
+.tda-header-left .hamburger { font-size: 20px; color: var(--text-muted); cursor: pointer; }
+.tda-header-left .chat-icon  { font-size: 20px; color: var(--text-muted); cursor: pointer; }
 .tda-logo-text {
-    font-size: 17px; font-weight: 700; color: #003087;
+    font-size: 17px; font-weight: 700; color: var(--accent);
     letter-spacing: 0.5px;
 }
-.tda-logo-text span { color: #e63946; }
-.tda-header-center img { height: 36px; }
+.tda-logo-text span { color: #ff4d6d; }
 .tda-header-center {
     position: absolute; left: 50%; transform: translateX(-50%);
     display: flex; align-items: center;
 }
 .tda-header-center .center-logo {
-    font-size: 15px; font-weight: 700; color: #003087;
-    border: 2px solid #003087; padding: 3px 10px; border-radius: 4px;
+    font-size: 15px; font-weight: 700; color: var(--accent);
+    border: 2px solid var(--accent); padding: 3px 10px; border-radius: 4px;
     letter-spacing: 1px;
+    box-shadow: 0 0 10px var(--glow);
 }
 .tda-header-center .center-sub {
-    font-size: 8px; color: #0077b6; letter-spacing: 2px;
-    text-align: center; display: block;
+    font-size: 8px; color: var(--accent); letter-spacing: 2px;
+    text-align: center; display: block; opacity: 0.7;
 }
 .tda-header-right { display: flex; align-items: center; gap: 10px; }
 .tda-badge {
-    background: linear-gradient(135deg, #0077b6, #00b4d8);
-    color: white; font-size: 11px; font-weight: 600;
+    background: linear-gradient(135deg, #0077b6, #00c2ff);
+    color: #000; font-size: 11px; font-weight: 700;
     padding: 3px 10px; border-radius: 12px; letter-spacing: 0.5px;
 }
 .tda-icon-btn {
     width: 34px; height: 34px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-size: 16px; cursor: pointer; color: #555;
+    font-size: 16px; cursor: pointer; color: var(--text-muted);
     transition: background 0.2s;
 }
-.tda-icon-btn:hover { background: #f0f2f5; }
+.tda-icon-btn:hover { background: var(--bg-hover); color: var(--accent); }
 .tda-avatar {
     width: 34px; height: 34px; border-radius: 50%;
-    background: linear-gradient(135deg, #003087, #0077b6);
+    background: linear-gradient(135deg, #0077b6, #00c2ff);
     display: flex; align-items: center; justify-content: center;
-    color: white; font-weight: 700; font-size: 13px;
+    color: #000; font-weight: 700; font-size: 13px;
+    box-shadow: 0 0 10px var(--glow);
 }
 
 /* ── LEFT ICON SIDEBAR ── */
 .tda-sidebar {
     position: fixed; left: 0; top: 58px; bottom: 0; width: 54px;
-    background: #ffffff;
-    border-right: 1px solid #e2e5ea;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
     display: flex; flex-direction: column;
     align-items: center; padding: 16px 0; gap: 6px;
     z-index: 999;
@@ -186,112 +211,143 @@ button[kind="header"],
 .nav-icon {
     width: 40px; height: 40px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px; cursor: pointer; color: #666;
-    transition: all 0.2s;
-    text-decoration: none;
+    font-size: 18px; cursor: pointer; color: var(--text-dim);
+    transition: all 0.2s; text-decoration: none;
 }
-.nav-icon:hover { background: #e8f0fe; color: #003087; }
-.nav-icon.active { background: #003087; color: white; }
-
-/* ── MAIN CONTENT AREA ── */
-.tda-main {
-    margin-left: 54px;
-    margin-top: 58px;
-    padding: 24px 32px;
-    min-height: calc(100vh - 58px);
+.nav-icon:hover {
+    background: var(--bg-hover);
+    color: var(--accent);
+    box-shadow: 0 0 8px var(--glow);
 }
+.nav-icon.active { background: var(--accent); color: #000; }
 
 /* ── WELCOME CARD ── */
 .welcome-card {
-    background: #ffffff;
-    border: 1px solid #e2e5ea;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 18px 22px;
     margin-bottom: 20px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
     max-width: 800px;
 }
 .welcome-card .bot-name {
-    font-size: 15px; font-weight: 700; color: #003087;
+    font-size: 15px; font-weight: 700; color: var(--accent);
     display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
 }
-.welcome-card p { color: #444; font-size: 14px; line-height: 1.6; margin: 0; }
+.welcome-card p { color: var(--text-muted); font-size: 14px; line-height: 1.6; margin: 0; }
 .welcome-card .show-more {
-    color: #0077b6; font-size: 13px; cursor: pointer;
+    color: var(--accent); font-size: 13px; cursor: pointer;
     text-decoration: underline; margin-top: 6px; display: inline-block;
 }
 
 /* ── CHAT MESSAGES ── */
 .chat-wrap { max-width: 800px; }
 
-/* ── BOTTOM INPUT BAR ── */
-.tda-input-bar {
-    position: fixed; bottom: 0; left: 54px; right: 0;
-    background: #ffffff;
-    border-top: 1px solid #e2e5ea;
-    padding: 12px 32px 16px;
-    z-index: 999;
-}
-.tda-input-inner {
-    max-width: 800px;
-    background: #f6f8fa;
-    border: 1px solid #d0d5dd;
-    border-radius: 14px;
-    display: flex; align-items: center;
-    padding: 8px 14px; gap: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    transition: border-color 0.2s, box-shadow 0.2s;
-}
-.tda-input-inner:focus-within {
-    border-color: #0077b6;
-    box-shadow: 0 0 0 3px rgba(0,119,182,0.12);
-}
-.tda-input-icon { font-size: 18px; color: #888; cursor: pointer; flex-shrink: 0; }
-.tda-input-icon:hover { color: #003087; }
-.tda-send-btn {
-    width: 36px; height: 36px; border-radius: 10px;
-    background: linear-gradient(135deg, #003087, #0077b6);
-    display: flex; align-items: center; justify-content: center;
-    color: white; font-size: 16px; cursor: pointer; flex-shrink: 0;
-    transition: transform 0.15s, opacity 0.15s;
-}
-.tda-send-btn:hover { transform: scale(1.08); opacity: 0.9; }
-.tda-footer-note {
-    text-align: center; font-size: 11px; color: #aaa;
-    margin-top: 8px; max-width: 800px;
+/* Dark chat bubbles */
+[data-testid="stChatMessage"] {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    color: var(--text-primary) !important;
 }
 
-/* Shift Streamlit chat input into our bar area */
+/* ── BOTTOM INPUT BAR (stChatInput) ── */
 [data-testid="stChatInput"] {
     position: fixed !important; bottom: 0 !important;
     left: 54px !important; right: 0 !important;
-    background: transparent !important;
+    background: var(--bg-surface) !important;
     padding: 10px 32px 14px !important;
-    border-top: 1px solid #e2e5ea;
+    border-top: 1px solid var(--border) !important;
     z-index: 1000;
 }
 [data-testid="stChatInput"] > div {
     max-width: 800px;
-    background: #f6f8fa;
-    border: 1px solid #d0d5dd;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
     border-radius: 14px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    box-shadow: 0 0 12px rgba(0,0,0,0.4);
+}
+[data-testid="stChatInput"] > div:focus-within {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px var(--glow) !important;
 }
 [data-testid="stChatInput"] textarea {
     background: transparent !important;
+    color: var(--text-primary) !important;
+    caret-color: var(--accent) !important;
 }
+[data-testid="stChatInput"] textarea::placeholder {
+    color: var(--text-dim) !important;
+}
+/* Send arrow button inside chat input */
+[data-testid="stChatInput"] button {
+    background: linear-gradient(135deg, #0077b6, #00c2ff) !important;
+    border-radius: 10px !important;
+    color: #000 !important;
+}
+
+/* ── SELECTBOX / DROPDOWNS ── */
+[data-testid="stSelectbox"] > div > div {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
+    border-radius: 10px !important;
+}
+
+/* ── STREAMLIT BUTTONS ── */
+.stButton button {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    transition: all 0.2s;
+}
+.stButton button:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 8px var(--glow);
+}
+
+/* ── TEXT / MARKDOWN ── */
+.stMarkdown, .stMarkdown p, .stMarkdown li,
+h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
+    color: var(--text-primary) !important;
+}
+.stTextInput input, .stTextArea textarea {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+}
+.stTextInput input:focus, .stTextArea textarea:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px var(--glow) !important;
+}
+
+/* ── DATAFRAME / TABLES ── */
+[data-testid="stDataFrame"],
+.stDataFrame { background: var(--bg-card) !important; }
+
+/* ── FILE UPLOADER BUTTON (dark pill style) ── */
+[data-testid="stFileUploader"] button::before { color: var(--accent) !important; }
+[data-testid="stFileUploader"] button:hover { background: var(--bg-hover) !important; }
+
+/* ── UPLOADED FILE PILL (dark) ── */
+[data-testid="stFileUploaderFile"] {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* Push page content above pinned input */
 .main .block-container { padding-bottom: 100px !important; padding-top: 10px !important; }
-
-/* Streamlit button style */
-.stButton button {
-    border-radius: 10px;
-    border: 1px solid #d0d5dd;
-    background: #fff;
-    transition: all 0.2s;
-}
-.stButton button:hover { background: #e8f0fe; border-color: #0077b6; }
 </style>
 
 <!-- TOP HEADER -->
