@@ -465,13 +465,14 @@ st.markdown(f"""
 
 <!-- LEFT ICON SIDEBAR -->
 <div class="tda-sidebar">
-  <a href="?page=Chat" class="nav-icon {get_active("Chat")}" title="Chat">💬</a>
-  <a href="?page=Charts" class="nav-icon {get_active("Charts")}" title="Charts">📊</a>
+  <a href="?page=Chat" class="nav-icon {get_active("Chat")}" title="New Chat">💬</a>
   <a href="?page=Search" class="nav-icon {get_active("Search")}" title="Search">🔍</a>
-  <div class="nav-icon" title="Images">🖼️</div>
-  <div class="nav-icon" title="Research">🧠</div>
-  <div class="nav-icon" title="Codex">💻</div>
-  <div class="nav-icon" title="GPTs">🤖</div>
+  <a href="?page=Charts" class="nav-icon {get_active("Charts")}" title="Charts">📊</a>
+  <a href="?page=Images" class="nav-icon {get_active("Images")}" title="Images">�️</a>
+  <a href="?page=Apps" class="nav-icon {get_active("Apps")}" title="Apps">�</a>
+  <a href="?page=Research" class="nav-icon {get_active("Research")}" title="Research">🧠</a>
+  <a href="?page=Codex" class="nav-icon {get_active("Codex")}" title="Codex">💻</a>
+  <a href="?page=GPTs" class="nav-icon {get_active("GPTs")}" title="GPTs">🤖</a>
 </div>
 
 <!-- BOTTOM TOOLBAR -->
