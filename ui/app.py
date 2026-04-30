@@ -43,53 +43,80 @@ button[kind="header"],
 /* Hide the top nav emoji-button row we injected */
 [data-testid="stHorizontalBlock"]:first-of-type { display: none !important; }
 
-/* File uploader — compact inline style next to chat input */
+/* ── FILE UPLOADER — 📎 icon pinned RIGHT beside the send arrow ── */
 [data-testid="stFileUploader"] {
     position: fixed !important;
-    bottom: 14px !important;
-    left: 74px !important;
+    bottom: 13px !important;
+    right: 37px !important;   /* sits just LEFT of the arrow send button */
+    left: auto !important;
     z-index: 1100 !important;
-    width: auto !important;
+    width: 38px !important;
+    height: 38px !important;
 }
-[data-testid="stFileUploader"] section {
-    border: none !important;
-    background: transparent !important;
-    padding: 0 !important;
-    min-height: unset !important;
+/* Hide the section/dropzone chrome entirely */
+[data-testid="stFileUploader"] section,
+[data-testid="stFileUploaderDropzone"],
+[data-testid="stFileUploaderDropzoneInstructions"],
+[data-testid="stFileUploader"] span,
+[data-testid="stFileUploader"] small {
+    display: none !important;
 }
 [data-testid="stFileUploader"] label { display: none !important; }
-[data-testid="stFileUploaderDropzone"] {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    min-height: unset !important;
-}
-[data-testid="stFileUploaderDropzoneInstructions"] { display: none !important; }
+/* Only show the "Browse files" button — style it as a 📎 icon */
 [data-testid="stFileUploader"] button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 10px !important;
     background: transparent !important;
     border: none !important;
-    font-size: 22px !important;
-    color: #555 !important;
-    padding: 4px 6px !important;
+    font-size: 0px !important;          /* hide button text */
+    color: transparent !important;
     cursor: pointer !important;
-    line-height: 1 !important;
-    border-radius: 8px !important;
+    position: relative !important;
     transition: background 0.2s !important;
+}
+/* Inject a 📎 emoji via pseudo-element */
+[data-testid="stFileUploader"] button::before {
+    content: '📎' !important;
+    font-size: 20px !important;
+    color: #555 !important;
+    display: block !important;
 }
 [data-testid="stFileUploader"] button:hover {
     background: #e8f0fe !important;
+}
+[data-testid="stFileUploader"] button:hover::before {
     color: #003087 !important;
 }
-/* Uploaded file name pill */
+/* Uploaded filename pill — shows above the input bar */
 [data-testid="stFileUploaderFile"] {
     position: fixed !important;
-    bottom: 70px !important;
-    left: 74px !important;
+    bottom: 65px !important;
+    right: 80px !important;
     background: #e8f0fe !important;
-    border-radius: 8px !important;
-    padding: 4px 10px !important;
+    border-radius: 20px !important;
+    padding: 4px 12px !important;
     font-size: 12px !important;
+    color: #003087 !important;
+    font-weight: 500 !important;
     z-index: 1100 !important;
+    border: 1px solid #b3d0f0 !important;
+    max-width: 220px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+/* Delete (×) button on the file pill */
+[data-testid="stFileUploaderDeleteBtn"] button {
+    font-size: 12px !important;
+    color: #003087 !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 0 0 4px !important;
+    cursor: pointer !important;
 }
 
 /* Full viewport body */
