@@ -4,11 +4,6 @@ import hmac
 import secrets as pysecrets
 from pathlib import Path
 
-try:
-    import tomllib
-except ModuleNotFoundError:
-    tomllib = None
-
 import streamlit as st
 
 
@@ -45,27 +40,43 @@ def verify_password(password: str, stored_hash: str) -> bool:
 
 
 
+def _read_local_users() -> dict:
+    secrets_path = Path(__file__).resolve().parent / ".streamlit" / "secrets.toml"
+    users = {}
+    current_user = None
+
+    try:
+        lines = secrets_path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return {}
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if line.startswith("[auth.users.") and line.endswith("]"):
+            current_user = line.removeprefix("[auth.users.").removesuffix("]")
+            users[current_user] = {}
+            continue
+
+        if current_user and "=" in line:
+            key, value = line.split("=", 1)
+            users[current_user][key.strip()] = value.strip().strip('"').strip("'")
+
+    return users
+
+
 def _get_users() -> dict:
     try:
         auth_config = st.secrets.get("auth", {})
-        users = auth_config.get("users", {}) if isinstance(auth_config, dict) else {}
+        users = auth_config.get("users", {})
         if users:
             return users
     except Exception:
         pass
 
-    if tomllib is None:
-        return {}
-
-    secrets_path = Path(__file__).resolve().parent / ".streamlit" / "secrets.toml"
-    try:
-        data = tomllib.loads(secrets_path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-
-    auth_config = data.get("auth", {})
-    users = auth_config.get("users", {}) if isinstance(auth_config, dict) else {}
-    return users if isinstance(users, dict) else {}
+    return _read_local_users()
 
 
 def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
