@@ -7,7 +7,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
 import streamlit as st
-from auth import require_login
+from auth import require_login, logout_link
 
 import streamlit as st
 from app.orchestrator import answer_query as orchestrator_answer_query
