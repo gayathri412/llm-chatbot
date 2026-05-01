@@ -2,7 +2,6 @@ import base64
 import hashlib
 import hmac
 import secrets as pysecrets
-from typing import Any
 
 import streamlit as st
 
@@ -52,12 +51,7 @@ def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
             "name": st.session_state.get("auth_name", ""),
         }
 
-    users = {
-        "admin": {
-             "name": "SNTI Admin",
-             "password_hash": hash_password("admin123"),
-        }
-    }
+    users = st.secrets.get("auth", {}).get("users", {})
 
     st.markdown(
         """

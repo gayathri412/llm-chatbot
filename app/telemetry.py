@@ -1,10 +1,10 @@
-import hashlib
 import json
 import logging
 import time
 from typing import Any
 
 from app.config import get_settings
+from app.security import estimate_tokens, hash_text
 
 try:
     from google.cloud import bigquery
@@ -21,10 +21,6 @@ LOGGER_NAME = "snti-ai-telemetry"
 logger = logging.getLogger(LOGGER_NAME)
 if not logger.handlers:
     logging.basicConfig(level=get_settings().log_level)
-
-
-def _hash_text(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _preview(text: str, limit: int = 300) -> str:
@@ -115,17 +111,35 @@ def build_chat_payload(
     context_items: list[dict[str, Any]] | None = None,
     response: str = "",
     error: str = "",
+    user_id: str = "anonymous",
+    prompt_text: str = "",
+    pii_redacted: bool = False,
+    pii_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     context_items = context_items or []
+    pii_counts = pii_counts or {"emails": 0, "phones": 0}
+    settings = get_settings()
+    audit_text = prompt_text or query
+    input_tokens = estimate_tokens(audit_text)
+    output_tokens = estimate_tokens(response)
+
     return {
-        "query_hash": _hash_text(query),
+        "user_id": user_id,
+        "query_hash": hash_text(query),
         "query_preview": _preview(query),
+        "prompt_hash": hash_text(audit_text),
+        "prompt_preview": _preview(audit_text) if settings.audit_prompt_preview_enabled else "",
         "model_choice": model_choice,
         "duration_ms": duration_ms,
         "status": status,
         "tool": tool,
         "cache_hit": cache_hit,
         "cache_backend": cache_backend,
+        "input_tokens_est": input_tokens,
+        "output_tokens_est": output_tokens,
+        "total_tokens_est": input_tokens + output_tokens,
+        "pii_redacted": pii_redacted,
+        "pii_counts": pii_counts,
         "context_count": len(context_items),
         "context_sources": [
             f"{item.get('title', 'Untitled')}:{item.get('source', 'unknown')}"

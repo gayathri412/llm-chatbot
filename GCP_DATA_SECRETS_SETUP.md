@@ -4,7 +4,7 @@ This project now supports:
 
 - Raw JSON -> staging GCS bucket -> BigQuery curated context table.
 - Secret Manager for API keys.
-- Service Account + IAM permissions for BigQuery, GCS, logging, and secrets.
+- Least-privilege Service Accounts + IAM permissions for BigQuery, GCS, logging, and secrets.
 - BigQuery-first RAG with local JSON fallback.
 
 ## 1. Choose Project Values
@@ -36,26 +36,41 @@ gcloud services enable secretmanager.googleapis.com --project eco-precept-466120
 gcloud services enable logging.googleapis.com --project eco-precept-466120-v0
 ```
 
-## 3. Create Service Account
+Secret Manager can require billing to enable. If billing is not enabled, keep `SECRET_MANAGER_ENABLED=false` and use your local `.env` file for development.
+
+## 3. Create Service Accounts
+
+Use two service accounts so the running chatbot only has read access, while ingestion jobs get write access.
 
 ```powershell
-gcloud iam service-accounts create snti-chatbot-sa --project eco-precept-466120-v0 --display-name "SNTI Chatbot Service Account"
+gcloud iam service-accounts create snti-chatbot-runtime-sa --project eco-precept-466120-v0 --display-name "SNTI Chatbot Runtime"
+gcloud iam service-accounts create snti-chatbot-ingest-sa --project eco-precept-466120-v0 --display-name "SNTI Chatbot Ingestion"
 ```
 
-Service account email:
+Service account emails:
 
 ```text
-snti-chatbot-sa@eco-precept-466120-v0.iam.gserviceaccount.com
+snti-chatbot-runtime-sa@eco-precept-466120-v0.iam.gserviceaccount.com
+snti-chatbot-ingest-sa@eco-precept-466120-v0.iam.gserviceaccount.com
 ```
 
 ## 4. Grant IAM Roles
 
+Runtime service account: read context, run BigQuery jobs, write logs, and read secrets.
+
 ```powershell
-gcloud projects add-iam-policy-binding eco-precept-466120-v0 --member "serviceAccount:snti-chatbot-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/bigquery.jobUser"
-gcloud projects add-iam-policy-binding eco-precept-466120-v0 --member "serviceAccount:snti-chatbot-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/bigquery.dataEditor"
-gcloud projects add-iam-policy-binding eco-precept-466120-v0 --member "serviceAccount:snti-chatbot-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/storage.objectAdmin"
-gcloud projects add-iam-policy-binding eco-precept-466120-v0 --member "serviceAccount:snti-chatbot-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/secretmanager.secretAccessor"
-gcloud projects add-iam-policy-binding eco-precept-466120-v0 --member "serviceAccount:snti-chatbot-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/logging.logWriter"
+gcloud projects add-iam-policy-binding eco-precept-466120-v0 --member "serviceAccount:snti-chatbot-runtime-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/bigquery.jobUser"
+bq add-iam-policy-binding --member "serviceAccount:snti-chatbot-runtime-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/bigquery.dataViewer" eco-precept-466120-v0:analytics
+gcloud projects add-iam-policy-binding eco-precept-466120-v0 --member "serviceAccount:snti-chatbot-runtime-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/logging.logWriter"
+gcloud projects add-iam-policy-binding eco-precept-466120-v0 --member "serviceAccount:snti-chatbot-runtime-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/secretmanager.secretAccessor"
+```
+
+Ingestion service account: write staged files and load curated BigQuery tables.
+
+```powershell
+gcloud projects add-iam-policy-binding eco-precept-466120-v0 --member "serviceAccount:snti-chatbot-ingest-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/bigquery.jobUser"
+bq add-iam-policy-binding --member "serviceAccount:snti-chatbot-ingest-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/bigquery.dataEditor" eco-precept-466120-v0:analytics
+gcloud storage buckets add-iam-policy-binding gs://eco-precept-466120-v0-snti-staging --member "serviceAccount:snti-chatbot-ingest-sa@eco-precept-466120-v0.iam.gserviceaccount.com" --role "roles/storage.objectAdmin"
 ```
 
 ## 5. Create Staging Bucket
@@ -112,6 +127,8 @@ CLUSTER BY doc_id, source;
 
 ## 7. Store API Keys In Secret Manager
 
+This is the production setup. It requires Secret Manager to be enabled, and Google Cloud may require billing for that API.
+
 Create secrets:
 
 ```powershell
@@ -128,6 +145,14 @@ gcloud secrets versions add groq-api-key --project eco-precept-466120-v0 --data-
 Set-Content -Path gemini_key.txt -Value "YOUR_GEMINI_API_KEY" -NoNewline
 gcloud secrets versions add gemini-api-key --project eco-precept-466120-v0 --data-file gemini_key.txt
 ```
+
+Inject secrets into Cloud Run instead of writing keys in code:
+
+```powershell
+gcloud run deploy snti-ai-assistant --project eco-precept-466120-v0 --region asia-south1 --service-account snti-chatbot-runtime-sa@eco-precept-466120-v0.iam.gserviceaccount.com --set-secrets GROQ_API_KEY=groq-api-key:latest,GEMINI_API_KEY=gemini-api-key:latest --set-env-vars SECRET_MANAGER_ENABLED=false,PII_REDACTION_ENABLED=true,AUDIT_PROMPT_PREVIEW_ENABLED=false
+```
+
+If your code should read Secret Manager directly at runtime, keep `SECRET_MANAGER_ENABLED=true` and grant `roles/secretmanager.secretAccessor` to the runtime service account.
 
 ## 8. Configure `.env`
 
@@ -148,6 +173,8 @@ CLOUD_LOGGING_ENABLED=true
 BIGQUERY_TELEMETRY_ENABLED=true
 BIGQUERY_TELEMETRY_DATASET=analytics
 BIGQUERY_TELEMETRY_TABLE=chat_telemetry
+PII_REDACTION_ENABLED=true
+AUDIT_PROMPT_PREVIEW_ENABLED=false
 ```
 
 ## 9. Authenticate Locally
@@ -161,8 +188,8 @@ gcloud auth application-default login
 Or use a service account key only for local testing:
 
 ```powershell
-gcloud iam service-accounts keys create snti-chatbot-sa.json --iam-account snti-chatbot-sa@eco-precept-466120-v0.iam.gserviceaccount.com --project eco-precept-466120-v0
-$env:GOOGLE_APPLICATION_CREDENTIALS="C:\Users\Gayathri\OneDrive\Desktop\llm-chatbot\snti-chatbot-sa.json"
+gcloud iam service-accounts keys create snti-chatbot-runtime-sa.json --iam-account snti-chatbot-runtime-sa@eco-precept-466120-v0.iam.gserviceaccount.com --project eco-precept-466120-v0
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\Users\Gayathri\OneDrive\Desktop\llm-chatbot\snti-chatbot-runtime-sa.json"
 ```
 
 Do not commit service account key files.
@@ -206,3 +233,33 @@ streamlit run ui/app.py --server.fileWatcherType none
 Ask a question from `data/docs.json`.
 
 If `RAG_USE_BIGQUERY=true`, the retriever checks BigQuery first. If BigQuery is unavailable or has no match, local JSON fallback still works.
+
+## 12. Security, Audit, And Optional Network Controls
+
+The app now masks emails and phone numbers before sending prompts to the LLM when `PII_REDACTION_ENABLED=true`.
+
+Telemetry/audit logs include:
+
+- `user_id`
+- `event_ts`
+- `query_hash`
+- `prompt_hash`
+- `duration_ms`
+- estimated input/output token counts
+- cache status
+- context source count
+- PII redaction status
+
+Raw prompt previews are disabled by default. Keep this setting unless you explicitly need prompt previews for debugging:
+
+```env
+AUDIT_PROMPT_PREVIEW_ENABLED=false
+```
+
+Optional Cloud Run private egress:
+
+```powershell
+gcloud run deploy snti-ai-assistant --project eco-precept-466120-v0 --region asia-south1 --vpc-connector YOUR_CONNECTOR --vpc-egress private-ranges-only
+```
+
+For private access to Google APIs from a VPC, enable Private Google Access on the subnet used by the connector.

@@ -44,14 +44,25 @@ CLOUD_LOGGING_ENABLED=true
 
 Each answer emits a `chat.answer` telemetry event with:
 
+- user id
 - query hash and short preview
+- prompt hash
 - model choice
 - duration
 - selected tool
 - cache hit status
 - retrieved context count and sources
+- estimated input/output token counts
+- PII redaction status
 - response length
 - error status if any
+
+Prompt previews are disabled by default. Keep this unless you need temporary debugging:
+
+```env
+AUDIT_PROMPT_PREVIEW_ENABLED=false
+PII_REDACTION_ENABLED=true
+```
 
 ## BigQuery Telemetry
 
@@ -61,14 +72,22 @@ Create a table like this:
 CREATE TABLE `your-gcp-project-id.analytics.chat_telemetry` (
   event_name STRING,
   event_ts TIMESTAMP,
+  user_id STRING,
   query_hash STRING,
   query_preview STRING,
+  prompt_hash STRING,
+  prompt_preview STRING,
   model_choice STRING,
   duration_ms INT64,
   status STRING,
   tool STRING,
   cache_hit BOOL,
   cache_backend STRING,
+  input_tokens_est INT64,
+  output_tokens_est INT64,
+  total_tokens_est INT64,
+  pii_redacted BOOL,
+  pii_counts JSON,
   context_count INT64,
   context_sources ARRAY<STRING>,
   response_chars INT64,

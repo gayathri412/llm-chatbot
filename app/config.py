@@ -57,6 +57,8 @@ class AppSettings(BaseModel):
     telemetry_enabled: bool = Field(default=True)
     cloud_logging_enabled: bool = Field(default=True)
     bigquery_telemetry_enabled: bool = Field(default=False)
+    telemetry_file_enabled: bool = Field(default=True)
+    telemetry_file_path: str = Field(default="logs/chat_telemetry.jsonl")
     bigquery_telemetry_dataset: str = Field(default="analytics")
     bigquery_telemetry_table: str = Field(default="chat_telemetry")
     log_level: str = Field(default="INFO")
@@ -70,6 +72,8 @@ class AppSettings(BaseModel):
     secret_manager_enabled: bool = Field(default=False)
     groq_api_key_secret: str = Field(default="groq-api-key")
     gemini_api_key_secret: str = Field(default="gemini-api-key")
+    pii_redaction_enabled: bool = Field(default=True)
+    audit_prompt_preview_enabled: bool = Field(default=False)
 
     @classmethod
     def from_env(cls) -> "AppSettings":
@@ -90,6 +94,8 @@ class AppSettings(BaseModel):
             telemetry_enabled=_env_bool("TELEMETRY_ENABLED", "true"),
             cloud_logging_enabled=_env_bool("CLOUD_LOGGING_ENABLED", "true"),
             bigquery_telemetry_enabled=_env_bool("BIGQUERY_TELEMETRY_ENABLED"),
+            telemetry_file_enabled=_env_bool("TELEMETRY_FILE_ENABLED", "true"),
+            telemetry_file_path=os.getenv("TELEMETRY_FILE_PATH", "logs/chat_telemetry.jsonl"),
             bigquery_telemetry_dataset=os.getenv("BIGQUERY_TELEMETRY_DATASET", "analytics"),
             bigquery_telemetry_table=os.getenv("BIGQUERY_TELEMETRY_TABLE", "chat_telemetry"),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
@@ -101,6 +107,8 @@ class AppSettings(BaseModel):
             secret_manager_enabled=_env_bool("SECRET_MANAGER_ENABLED"),
             groq_api_key_secret=os.getenv("GROQ_API_KEY_SECRET", "groq-api-key"),
             gemini_api_key_secret=os.getenv("GEMINI_API_KEY_SECRET", "gemini-api-key"),
+            pii_redaction_enabled=_env_bool("PII_REDACTION_ENABLED", "true"),
+            audit_prompt_preview_enabled=_env_bool("AUDIT_PROMPT_PREVIEW_ENABLED"),
         )
 
     def public_dict(self) -> dict[str, Any]:

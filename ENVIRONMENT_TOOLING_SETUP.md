@@ -86,7 +86,7 @@ Recommended trigger:
 ```text
 Branch: main
 Build config: cloudbuild.yaml
-Service account: snti-chatbot-sa
+Service account: snti-chatbot-runtime-sa
 ```
 
 ## Secrets
@@ -97,6 +97,9 @@ Billing-free local development:
 SECRET_MANAGER_ENABLED=false
 GROQ_API_KEY=your_key
 GEMINI_API_KEY=your_key
+PII_REDACTION_ENABLED=true
+AUDIT_PROMPT_PREVIEW_ENABLED=false
 ```
 
 Google Secret Manager path is already implemented in code, but enabling Secret Manager requires billing on your GCP project.
+Use `snti-chatbot-runtime-sa` for the running chatbot and `snti-chatbot-ingest-sa` for JSON -> GCS -> BigQuery ingestion jobs.

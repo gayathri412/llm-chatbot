@@ -14,6 +14,7 @@ class ChatRequest(BaseModel):
     model_choice: Literal["Llama", "Gemini"] = "Llama"
     temperature: float = Field(default=0.2, ge=0.0, le=1.0)
     include_trace: bool = False
+    user_id: str = "api_user"
 
 
 class ChatResponse(BaseModel):
@@ -48,6 +49,7 @@ def chat(request: ChatRequest):
         request.model_choice,
         include_trace=request.include_trace,
         temperature=request.temperature,
+        user_id=request.user_id,
     )
 
     if isinstance(result, dict):

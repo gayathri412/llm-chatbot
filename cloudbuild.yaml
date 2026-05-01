@@ -25,7 +25,7 @@ steps:
       - --region=${_REGION}
       - --platform=managed
       - --allow-unauthenticated
-      - --set-env-vars=GCP_PROJECT_ID=$PROJECT_ID,RAG_USE_BIGQUERY=true,BIGQUERY_CONTEXT_DATASET=analytics,BIGQUERY_CONTEXT_TABLE=chat_context_docs,SECRET_MANAGER_ENABLED=false
+      - --set-env-vars=GCP_PROJECT_ID=$PROJECT_ID,RAG_USE_BIGQUERY=true,BIGQUERY_CONTEXT_DATASET=analytics,BIGQUERY_CONTEXT_TABLE=chat_context_docs,SECRET_MANAGER_ENABLED=false,PII_REDACTION_ENABLED=true,AUDIT_PROMPT_PREVIEW_ENABLED=false
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/snti-ai/${_SERVICE}:$COMMIT_SHA
