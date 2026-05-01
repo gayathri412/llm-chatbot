@@ -2,6 +2,12 @@ import base64
 import hashlib
 import hmac
 import secrets as pysecrets
+from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    tomllib = None
 
 import streamlit as st
 
@@ -37,6 +43,31 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return False
 
 
+
+
+def _get_users() -> dict:
+    try:
+        auth_config = st.secrets.get("auth", {})
+        users = auth_config.get("users", {}) if isinstance(auth_config, dict) else {}
+        if users:
+            return users
+    except Exception:
+        pass
+
+    if tomllib is None:
+        return {}
+
+    secrets_path = Path(__file__).resolve().parent / ".streamlit" / "secrets.toml"
+    try:
+        data = tomllib.loads(secrets_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+    auth_config = data.get("auth", {})
+    users = auth_config.get("users", {}) if isinstance(auth_config, dict) else {}
+    return users if isinstance(users, dict) else {}
+
+
 def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
     if st.query_params.get("logout") == "1":
         st.session_state.authenticated = False
@@ -51,7 +82,7 @@ def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
             "name": st.session_state.get("auth_name", ""),
         }
 
-    users = st.secrets.get("auth", {}).get("users", {})
+    users = _get_users()
 
     st.markdown(
         """
