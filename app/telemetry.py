@@ -1,18 +1,10 @@
 import hashlib
 import json
 import logging
-import os
 import time
 from typing import Any
 
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    def load_dotenv(*args, **kwargs):
-        return False
-
-
-load_dotenv()
+from app.config import get_settings
 
 try:
     from google.cloud import bigquery
@@ -28,15 +20,7 @@ except ImportError:
 LOGGER_NAME = "snti-ai-telemetry"
 logger = logging.getLogger(LOGGER_NAME)
 if not logger.handlers:
-    logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
-
-
-def _env_bool(name: str, default: str = "false") -> bool:
-    return os.getenv(name, default).lower() in {"1", "true", "yes", "on"}
-
-
-def _project_id() -> str | None:
-    return os.getenv("GCP_PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
+    logging.basicConfig(level=get_settings().log_level)
 
 
 def _hash_text(text: str) -> str:
@@ -52,12 +36,13 @@ def _preview(text: str, limit: int = 300) -> str:
 
 class TelemetryClient:
     def __init__(self) -> None:
-        self.enabled = _env_bool("TELEMETRY_ENABLED", "true")
-        self.project_id = _project_id()
-        self.cloud_logging_enabled = _env_bool("CLOUD_LOGGING_ENABLED", "true")
-        self.bigquery_enabled = _env_bool("BIGQUERY_TELEMETRY_ENABLED", "false")
-        self.dataset = os.getenv("BIGQUERY_TELEMETRY_DATASET", "analytics")
-        self.table = os.getenv("BIGQUERY_TELEMETRY_TABLE", "chat_telemetry")
+        self.settings = get_settings()
+        self.enabled = self.settings.telemetry_enabled
+        self.project_id = self.settings.gcp_project_id
+        self.cloud_logging_enabled = self.settings.cloud_logging_enabled
+        self.bigquery_enabled = self.settings.bigquery_telemetry_enabled
+        self.dataset = self.settings.bigquery_telemetry_dataset
+        self.table = self.settings.bigquery_telemetry_table
         self._bq_client = None
         self._setup_cloud_logging()
 

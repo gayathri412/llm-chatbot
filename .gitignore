@@ -7,6 +7,10 @@ __pycache__/
 
 # Environment variables (API keys)
 .env
+groq_key.txt
+gemini_key.txt
+snti-chatbot-sa.json
+*service-account*.json
 
 # System files
 .DS_Store

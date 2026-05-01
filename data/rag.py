@@ -23,6 +23,10 @@ STOP_WORDS = {
 }
 
 
+def _env_bool(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).lower() in {"1", "true", "yes", "on"}
+
+
 def _clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", str(text)).strip()
 
@@ -130,7 +134,7 @@ def retrieve_context(query: str, limit: int = 4, min_score: float = 0.03) -> lis
 
     documents, vectorizer, matrix = _build_tfidf_index()
     if not documents:
-        return []
+        return _fetch_bigquery_context(query, limit=limit)
 
     if vectorizer is not None and matrix is not None and cosine_similarity is not None:
         query_vector = vectorizer.transform([query])
@@ -152,6 +156,7 @@ def retrieve_context(query: str, limit: int = 4, min_score: float = 0.03) -> lis
                 "title": doc["title"],
                 "body": doc["body"],
                 "source": doc["source"],
+                "backend": "json",
                 "score": round(score, 4),
             }
         )
@@ -159,7 +164,50 @@ def retrieve_context(query: str, limit: int = 4, min_score: float = 0.03) -> lis
         if len(results) >= limit:
             break
 
+    bq_results = _fetch_bigquery_context(query, limit=limit)
+    return _dedupe_results([*bq_results, *results])[:limit]
+
+
+def _fetch_bigquery_context(query: str, limit: int = 4) -> list[dict[str, Any]]:
+    if not _env_bool("RAG_USE_BIGQUERY"):
+        return []
+
+    try:
+        from data.bq_client import fetch_context_from_bq
+
+        rows = fetch_context_from_bq(query, limit=limit)
+    except Exception:
+        return []
+
+    results = []
+    for row in rows:
+        body = row.get("body")
+        if not body:
+            continue
+
+        results.append(
+            {
+                "title": row.get("title") or "BigQuery Context",
+                "body": body,
+                "source": row.get("source") or "bigquery",
+                "backend": "bigquery",
+                "score": 1.0,
+            }
+        )
+
     return results
+
+
+def _dedupe_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen = set()
+    unique_results = []
+    for item in results:
+        key = (item.get("title"), item.get("body"))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_results.append(item)
+    return unique_results
 
 
 def format_context(results: list[dict[str, Any]]) -> str:

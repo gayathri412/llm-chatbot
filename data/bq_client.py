@@ -8,9 +8,12 @@ except ImportError:
     BQ_AVAILABLE = False
     bigquery = None
 
-import pandas as pd
 import json
+import os
+import re
 from typing import List, Dict, Optional
+
+import pandas as pd
 
 class BigQueryClient:
     """BigQuery client wrapper for data operations"""
@@ -27,18 +30,25 @@ class BigQueryClient:
         results = query_job.result()
         return results.to_dataframe()
     
-    def fetch_context(self, user_query: str, table: str = "chat_context_docs", 
+    def fetch_context(self, user_query: str, table: str = "chat_context_docs",
                      dataset: str = "analytics", limit: int = 5) -> List[Dict]:
         """Fetch context from BigQuery for RAG"""
+        safe_pattern = re.escape(user_query.lower())
         query = f"""
-        SELECT doc_id, title, body, source, updated_at
-        FROM `{self.project_id}.{dataset}.{table}` 
-        WHERE REGEXP_CONTAINS(LOWER(body), r'{user_query.lower()}')
-        OR REGEXP_CONTAINS(LOWER(title), r'{user_query.lower()}')
+        SELECT doc_id, title, body, source, updated_at, ingestion_date
+        FROM `{self.project_id}.{dataset}.{table}`
+        WHERE REGEXP_CONTAINS(LOWER(body), @pattern)
+        OR REGEXP_CONTAINS(LOWER(title), @pattern)
         ORDER BY updated_at DESC
-        LIMIT {limit}
+        LIMIT @limit
         """
-        rows = self.client.query(query).result()
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("pattern", "STRING", safe_pattern),
+                bigquery.ScalarQueryParameter("limit", "INT64", limit),
+            ]
+        )
+        rows = self.client.query(query, job_config=job_config).result()
         return [dict(r) for r in rows]
     
     def list_tables(self, dataset: str = "analytics") -> List[str]:
@@ -64,7 +74,9 @@ def fetch_context_from_bq(user_query: str, project_id: Optional[str] = None,
     if not BQ_AVAILABLE:
         return []
     client = BigQueryClient(project_id)
-    return client.fetch_context(user_query, limit=limit)
+    dataset = os.getenv("BIGQUERY_CONTEXT_DATASET", "analytics")
+    table = os.getenv("BIGQUERY_CONTEXT_TABLE", "chat_context_docs")
+    return client.fetch_context(user_query, dataset=dataset, table=table, limit=limit)
 
 # JSON ingestion utilities
 def prepare_json_for_bq(json_data: Dict) -> Dict:

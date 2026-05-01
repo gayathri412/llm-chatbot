@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+.git/
+.env
+.streamlit/secrets.toml
+groq_key.txt
+gemini_key.txt
+snti-chatbot-sa.json
+*service-account*.json

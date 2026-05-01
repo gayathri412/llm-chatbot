@@ -1,16 +1,8 @@
 import hashlib
 import json
-import os
 from typing import Any
 
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    def load_dotenv(*args, **kwargs):
-        return False
-
-
-load_dotenv()
+from app.config import get_settings
 
 try:
     import redis
@@ -20,9 +12,10 @@ except ImportError:
 
 class AnswerCache:
     def __init__(self) -> None:
-        self.enabled = os.getenv("CACHE_ENABLED", "true").lower() == "true"
-        self.ttl_seconds = int(os.getenv("CACHE_TTL_SECONDS", "3600"))
-        self.namespace = os.getenv("CACHE_NAMESPACE", "snti-ai")
+        self.settings = get_settings()
+        self.enabled = self.settings.cache_enabled
+        self.ttl_seconds = self.settings.cache_ttl_seconds
+        self.namespace = self.settings.cache_namespace
         self.backend = "disabled"
         self._memory_cache: dict[str, str] = {}
         self._redis_client = self._connect_redis()
@@ -35,8 +28,8 @@ class AnswerCache:
             self.backend = "memory"
             return None
 
-        redis_url = os.getenv("REDIS_URL")
-        redis_host = os.getenv("REDIS_HOST")
+        redis_url = self.settings.redis_url
+        redis_host = self.settings.redis_host
 
         try:
             if redis_url:
@@ -44,10 +37,10 @@ class AnswerCache:
             elif redis_host:
                 client = redis.Redis(
                     host=redis_host,
-                    port=int(os.getenv("REDIS_PORT", "6379")),
-                    db=int(os.getenv("REDIS_DB", "0")),
-                    password=os.getenv("REDIS_PASSWORD") or None,
-                    ssl=os.getenv("REDIS_SSL", "false").lower() == "true",
+                    port=self.settings.redis_port,
+                    db=self.settings.redis_db,
+                    password=self.settings.redis_password,
+                    ssl=self.settings.redis_ssl,
                     decode_responses=True,
                 )
             else:

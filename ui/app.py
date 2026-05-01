@@ -430,18 +430,39 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 """, unsafe_allow_html=True)
 
 # ---------- URL QUERY PARAMS & SESSION ----------
-query_params = st.query_params
-if "page" in query_params:
-    st.session_state.page = query_params["page"]
-    st.query_params.clear()
+PAGES = {
+    "Chat": {"title": "New Chat", "icon": "💬"},
+    "Search": {"title": "Search", "icon": "🔍"},
+    "Charts": {"title": "Charts", "icon": "📊"},
+    "BigData": {"title": "Big Data", "icon": "🗄️"},
+    "Images": {"title": "Images", "icon": "🖼️"},
+    "Apps": {"title": "Apps", "icon": "📱"},
+    "Research": {"title": "Research", "icon": "🧠"},
+    "Codex": {"title": "Codex", "icon": "💻"},
+    "GPTs": {"title": "GPTs", "icon": "🤖"},
+}
 
-if "page" not in st.session_state:
+query_page = st.query_params.get("page")
+if query_page in PAGES:
+    st.session_state.page = query_page
+elif "page" not in st.session_state or st.session_state.page not in PAGES:
     st.session_state.page = "Chat"
 
 current_page = st.session_state.page
 
-# Helper for active class
-def get_active(page): return "active" if current_page == page else ""
+
+def get_active(page):
+    return "active" if current_page == page else ""
+
+
+def nav_link(page):
+    item = PAGES[page]
+    return (
+        f'<a href="?page={page}" target="_self" '
+        f'class="nav-icon {get_active(page)}" '
+        f'title="{item["title"]}" aria-label="{item["title"]}">'
+        f'{item["icon"]}</a>'
+    )
 
 # ---------- HEADER HTML ----------
 st.markdown(f"""
@@ -469,15 +490,15 @@ st.markdown(f"""
 
 <!-- LEFT ICON SIDEBAR -->
 <div class="tda-sidebar">
-  <a href="?page=Chat" class="nav-icon {get_active("Chat")}" title="New Chat">💬</a>
-  <a href="?page=Search" class="nav-icon {get_active("Search")}" title="Search">🔍</a>
-  <a href="?page=Charts" class="nav-icon {get_active("Charts")}" title="Charts">📊</a>
-  <a href="?page=BigData" class="nav-icon {get_active("BigData")}" title="Big Data">🗄️</a>
-  <a href="?page=Images" class="nav-icon {get_active("Images")}" title="Images">🖼️</a>
-  <a href="?page=Apps" class="nav-icon {get_active("Apps")}" title="Apps">📱</a>
-  <a href="?page=Research" class="nav-icon {get_active("Research")}" title="Research">🧠</a>
-  <a href="?page=Codex" class="nav-icon {get_active("Codex")}" title="Codex">💻</a>
-  <a href="?page=GPTs" class="nav-icon {get_active("GPTs")}" title="GPTs">🤖</a>
+  {nav_link("Chat")}
+  {nav_link("Search")}
+  {nav_link("Charts")}
+  {nav_link("BigData")}
+  {nav_link("Images")}
+  {nav_link("Apps")}
+  {nav_link("Research")}
+  {nav_link("Codex")}
+  {nav_link("GPTs")}
 </div>
 
 <!-- BOTTOM TOOLBAR -->
@@ -500,8 +521,8 @@ if "chats" not in st.session_state:
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = "Chat 1"
 
-# ---------- NAV STATE (hidden buttons via session_state URL-style) ----------
-# The HTML sidebar icons above are decorative; real nav is via these hidden vars.
+# ---------- NAV STATE ----------
+# The HTML sidebar icons above route by query parameter (?page=...).
 # Model selector pinned to header area
 model_choice = st.selectbox("Model", ["Llama", "Gemini"], label_visibility="collapsed",
                              key="model_select")
@@ -522,6 +543,23 @@ if page == "Chat":
         st.session_state.current_chat = "New Chat"
 
     chat_history = st.session_state.chats[st.session_state.current_chat]
+
+    with st.expander("Chat settings", expanded=False):
+        temperature = st.slider(
+            "Temperature",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.2,
+            step=0.1,
+            key="temperature_control",
+            help="Lower values are more focused; higher values are more creative.",
+        )
+        show_context = st.toggle(
+            "Show context",
+            value=False,
+            key="show_context_control",
+            help="Show retrieved context sources and trace details under each assistant answer.",
+        )
 
     # ---------- FILE UPLOAD — embedded in bottom bar as 📎 icon ----------
     uploaded_file = st.file_uploader(
@@ -573,9 +611,35 @@ if page == "Chat":
         )
 
     # ---------- DISPLAY ----------
-    for q, r in chat_history:
+    for turn in chat_history:
+        if isinstance(turn, dict):
+            q = turn.get("user", "")
+            r = turn.get("bot", "")
+            trace = turn.get("trace")
+        else:
+            q, r = turn
+            trace = None
+
         st.chat_message("user").write(q)
-        st.chat_message("assistant").write(r)
+        with st.chat_message("assistant"):
+            st.write(r)
+            if show_context and trace:
+                with st.expander("Context and trace", expanded=False):
+                    st.write(
+                        {
+                            "used_context_count": trace.get("used_context_count", 0),
+                            "bq_hits": trace.get("bq_hits", 0),
+                            "json_hits": trace.get("json_hits", 0),
+                            "cache_hit": trace.get("cache_hit", False),
+                            "tool": trace.get("tool", "none"),
+                            "temperature": trace.get("temperature", temperature),
+                        }
+                    )
+                    sources = trace.get("context_sources", [])
+                    if sources:
+                        st.dataframe(sources, use_container_width=True)
+                    else:
+                        st.info("No retrieved context was used.")
     # ---------- INPUT ----------
     user_input = st.chat_input("Ask anything...", key="main_chat")
 
@@ -586,14 +650,49 @@ if page == "Chat":
             # 👉 PASS FILE CONTENT + USER QUESTION IF BOTH EXIST
             if file_text:
                 combined_query = f"{user_input}\n\nFile content:\n{file_text}"
-                response = answer_query(combined_query, model_choice)
+                result = answer_query(
+                    combined_query,
+                    model_choice,
+                    include_trace=show_context,
+                    temperature=temperature,
+                )
             else:
-                response = answer_query(user_input, model_choice)
+                result = answer_query(
+                    user_input,
+                    model_choice,
+                    include_trace=show_context,
+                    temperature=temperature,
+                )
 
-        st.chat_message("assistant").write(response)
+        if isinstance(result, dict):
+            response = result["answer"]
+            trace = result.get("trace")
+        else:
+            response = result
+            trace = None
+
+        with st.chat_message("assistant"):
+            st.write(response)
+            if show_context and trace:
+                with st.expander("Context and trace", expanded=False):
+                    st.write(
+                        {
+                            "used_context_count": trace.get("used_context_count", 0),
+                            "bq_hits": trace.get("bq_hits", 0),
+                            "json_hits": trace.get("json_hits", 0),
+                            "cache_hit": trace.get("cache_hit", False),
+                            "tool": trace.get("tool", "none"),
+                            "temperature": trace.get("temperature", temperature),
+                        }
+                    )
+                    sources = trace.get("context_sources", [])
+                    if sources:
+                        st.dataframe(sources, use_container_width=True)
+                    else:
+                        st.info("No retrieved context was used.")
 
         # store in chat
-        chat_history.append((user_input, response))
+        chat_history.append({"user": user_input, "bot": response, "trace": trace})
 
         # ---------- GLOBAL MEMORY ----------
         if "global_history" not in st.session_state:
