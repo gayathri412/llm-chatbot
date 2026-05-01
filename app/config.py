@@ -43,6 +43,7 @@ class AppSettings(BaseModel):
     auth_provider: str = Field(default="firebase")
     firebase_web_api_key: str | None = Field(default=None)
     firebase_project_id: str | None = Field(default=None)
+    firebase_storage_bucket: str | None = Field(default=None)
 
     gcp_project_id: str | None = Field(default=None)
     gcp_location: str = Field(default="US")
@@ -86,6 +87,7 @@ class AppSettings(BaseModel):
             auth_provider=os.getenv("AUTH_PROVIDER", "firebase"),
             firebase_web_api_key=os.getenv("FIREBASE_WEB_API_KEY") or None,
             firebase_project_id=os.getenv("FIREBASE_PROJECT_ID") or None,
+            firebase_storage_bucket=os.getenv("FIREBASE_STORAGE_BUCKET") or None,
             gcp_project_id=os.getenv("GCP_PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT") or None,
             gcp_location=os.getenv("GCP_LOCATION", "US"),
             cache_enabled=_env_bool("CACHE_ENABLED", "true"),

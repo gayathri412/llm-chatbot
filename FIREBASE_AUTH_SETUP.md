@@ -20,6 +20,7 @@ For local development, add it to `.env`:
 AUTH_PROVIDER=firebase
 FIREBASE_WEB_API_KEY=your_firebase_web_api_key
 FIREBASE_PROJECT_ID=your_firebase_project_id
+FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
 ```
 
 Restart Streamlit after changing `.env`:
@@ -55,8 +56,10 @@ Deploy Cloud Run with the Firebase key injected:
 gcloud run deploy snti-ai-assistant `
   --project eco-precept-466120-v0 `
   --region asia-south1 `
-  --set-env-vars AUTH_PROVIDER=firebase,FIREBASE_PROJECT_ID=eco-precept-466120-v0 `
+  --set-env-vars AUTH_PROVIDER=firebase,FIREBASE_PROJECT_ID=eco-precept-466120-v0,FIREBASE_STORAGE_BUCKET=eco-precept-466120-v0.appspot.com `
   --set-secrets FIREBASE_WEB_API_KEY=firebase-web-api-key:latest
 ```
+
+For storage-specific setup and IAM permissions, see `FIREBASE_STORAGE_SETUP.md`.
 
 Do not commit `.env`, `.streamlit/secrets.toml`, or temporary key files.

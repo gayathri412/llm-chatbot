@@ -11,6 +11,7 @@ from auth import require_login
 
 import streamlit as st
 from app.orchestrator import answer_query as orchestrator_answer_query
+from app.firebase_storage import FirebaseStorageError, upload_streamlit_file
 
 
 st.set_page_config(page_title="SNTI AI Assistant", page_icon="🤖", layout="wide")
@@ -22,6 +23,39 @@ auth_user_id = current_user.get("user_id") or current_user.get("username", "anon
 def answer_query(query, model_choice="Llama", **kwargs):
     kwargs.setdefault("user_id", auth_user_id)
     return orchestrator_answer_query(query, model_choice, **kwargs)
+
+
+def save_upload_to_firebase(uploaded_file, area: str) -> dict | None:
+    if not uploaded_file:
+        return None
+
+    file_key = (
+        getattr(uploaded_file, "file_id", None)
+        or f"{uploaded_file.name}:{getattr(uploaded_file, 'size', '')}"
+    )
+    session_key = f"firebase_storage_upload:{area}:{file_key}"
+
+    if session_key in st.session_state:
+        stored = st.session_state[session_key]
+        if stored.get("uri"):
+            st.caption(f"Saved to Firebase Storage: `{stored['uri']}`")
+            return stored
+        return None
+
+    try:
+        stored = upload_streamlit_file(uploaded_file, user_id=auth_user_id, area=area)
+    except FirebaseStorageError as exc:
+        st.session_state[session_key] = {"error": str(exc)}
+        st.warning(f"Firebase Storage upload skipped: {exc}")
+        return None
+    except Exception as exc:
+        st.session_state[session_key] = {"error": str(exc)}
+        st.warning(f"Firebase Storage upload failed: {exc}")
+        return None
+
+    st.session_state[session_key] = stored
+    st.caption(f"Saved to Firebase Storage: `{stored['uri']}`")
+    return stored
 
 
 # ---------- GLOBAL ----------
@@ -617,6 +651,7 @@ if page == "Chat":
 
     file_text = ""
     if uploaded_file:
+        save_upload_to_firebase(uploaded_file, "chat")
         fname = uploaded_file.name.lower()
 
         if fname.endswith(".txt"):
@@ -789,6 +824,7 @@ elif page == "Charts":
     )
 
     if file:
+        save_upload_to_firebase(file, "charts")
         st.success(f"Uploaded: {file.name}")
 
         styles = getSampleStyleSheet()
@@ -1160,6 +1196,7 @@ elif page == "BigData":
         uploaded_file = st.file_uploader("Upload CSV or JSON", type=["csv", "json"])
 
         if uploaded_file:
+            save_upload_to_firebase(uploaded_file, "bigdata")
             if uploaded_file.name.endswith('.csv'):
                 df = pd.read_csv(uploaded_file)
                 st.session_state.uploaded_df = df
@@ -1452,6 +1489,7 @@ elif page == "Images":
         vw, vh = map(int, var_size.replace("×", "x").split("x"))
 
         if var_file:
+            save_upload_to_firebase(var_file, "images-variations")
             src_img = Image.open(var_file)
             st.image(src_img, caption="Source image", width=300)
 
@@ -1507,6 +1545,7 @@ elif page == "Images":
         ew, eh = map(int, edit_size.replace("×", "x").split("x"))
 
         if edit_file:
+            save_upload_to_firebase(edit_file, "images-edit")
             src_img = Image.open(edit_file).convert("RGB")
             st.image(src_img, caption="Image to edit", width=300)
 
@@ -1544,6 +1583,7 @@ elif page == "Images":
         prev_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="prev_up")
 
         if prev_file:
+            save_upload_to_firebase(prev_file, "images-preview")
             image = Image.open(prev_file)
             st.image(image, caption="Uploaded Image")
             st.write(f"**Size:** {image.size[0]} × {image.size[1]} px")
@@ -1586,6 +1626,7 @@ elif page == "Images":
         ocr_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="ocr_up")
 
         if ocr_file:
+            save_upload_to_firebase(ocr_file, "images-ocr")
             ocr_img = Image.open(ocr_file)
             st.image(ocr_img, width=300)
             
@@ -1617,6 +1658,7 @@ elif page == "Images":
         enh_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="enh_up")
 
         if enh_file:
+            save_upload_to_firebase(enh_file, "images-enhance")
             enh_img    = Image.open(enh_file)
             brightness = st.slider("Brightness", 0.5, 2.0, 1.0, key="brightness")
             contrast   = st.slider("Contrast",   0.5, 2.0, 1.0, key="contrast")
@@ -1669,6 +1711,7 @@ if page == "Apps":
         file = st.file_uploader("Upload PDF", type=["pdf"])
 
         if file:
+            save_upload_to_firebase(file, "apps-pdf")
             text = ""
             with pdfplumber.open(file) as pdf:
                 for page in pdf.pages:
@@ -1690,6 +1733,7 @@ if page == "Apps":
         file = st.file_uploader("Upload CSV", type=["csv"])
 
         if file:
+            save_upload_to_firebase(file, "apps-csv")
             df = pd.read_csv(file)
             st.dataframe(df.head())
 
