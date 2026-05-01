@@ -7,17 +7,13 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
 import streamlit as st
-from auth import require_login, logout_link
+from auth import require_login
 
 import streamlit as st
 from app.orchestrator import answer_query as orchestrator_answer_query
 
 
 st.set_page_config(page_title="SNTI AI Assistant", page_icon="🤖", layout="wide")
-from auth import require_login
-
-current_user = require_login("LLM Chatbot")
-
 
 current_user = require_login("SNTI AI Assistant")
 auth_user_id = current_user.get("user_id") or current_user.get("username", "anonymous")
@@ -256,6 +252,41 @@ button[kind="header"],
 }
 .nav-icon.active, a.nav-icon.active { background: var(--accent) !important; color: #000 !important; }
 
+.st-key-page_navigation {
+    position: fixed;
+    left: 0;
+    top: 58px;
+    bottom: 0;
+    width: 54px;
+    z-index: 1002;
+    padding-top: 16px;
+}
+.st-key-page_navigation [role="radiogroup"] {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+.st-key-page_navigation label {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    cursor: pointer !important;
+}
+.st-key-page_navigation label > div:first-child { display: none !important; }
+.st-key-page_navigation label p {
+    font-size: 18px !important;
+    line-height: 1 !important;
+}
+.st-key-page_navigation label:hover {
+    background: var(--bg-hover) !important;
+    box-shadow: 0 0 8px var(--glow);
+}
+
 /* ── WELCOME CARD ── */
 .welcome-card {
     background: var(--bg-card);
@@ -460,6 +491,18 @@ if query_page in PAGES:
 elif "page" not in st.session_state or st.session_state.page not in PAGES:
     st.session_state.page = "Chat"
 
+page_options = list(PAGES)
+selected_page = st.radio(
+    "Navigation",
+    page_options,
+    index=page_options.index(st.session_state.page),
+    format_func=lambda page_name: PAGES[page_name]["icon"],
+    horizontal=False,
+    label_visibility="collapsed",
+    key="page_navigation",
+)
+st.session_state.page = selected_page
+
 current_page = st.session_state.page
 
 
@@ -470,10 +513,10 @@ def get_active(page):
 def nav_link(page):
     item = PAGES[page]
     return (
-        f'<a href="?page={page}" target="_self" '
+        f'<span '
         f'class="nav-icon {get_active(page)}" '
         f'title="{item["title"]}" aria-label="{item["title"]}">'
-        f'{item["icon"]}</a>'
+        f'{item["icon"]}</span>'
     )
 
 # ---------- HEADER HTML ----------
@@ -496,21 +539,12 @@ st.markdown(f"""
     <span class="tda-badge">Gemini</span>
     <div class="tda-icon-btn">🔖</div>
     <div class="tda-icon-btn">🔔</div>
-    {logout_link()}
+    <div class="tda-avatar">S</div>
   </div>
 </div>
 
 <!-- LEFT ICON SIDEBAR -->
 <div class="tda-sidebar">
-  {nav_link("Chat")}
-  {nav_link("Search")}
-  {nav_link("Charts")}
-  {nav_link("BigData")}
-  {nav_link("Images")}
-  {nav_link("Apps")}
-  {nav_link("Research")}
-  {nav_link("Codex")}
-  {nav_link("GPTs")}
 </div>
 
 <!-- BOTTOM TOOLBAR -->
