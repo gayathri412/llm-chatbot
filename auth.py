@@ -64,8 +64,24 @@ def _friendly_firebase_error(code: str) -> str:
             "Too many attempts. Please wait a moment and try again."
         ),
         "INVALID_EMAIL": "Please enter a valid email address.",
+        "OPERATION_NOT_ALLOWED": (
+            "Email/password sign-in is not enabled in Firebase. "
+            "Open Firebase Authentication > Sign-in method and enable Email/Password."
+        ),
+        "PASSWORD_LOGIN_DISABLED": (
+            "Email/password sign-in is not enabled in Firebase. "
+            "Open Firebase Authentication > Sign-in method and enable Email/Password."
+        ),
+        "CONFIGURATION_NOT_FOUND": (
+            "Firebase Authentication is not initialized for this project. "
+            "Open Firebase Authentication, click Get started, and enable Email/Password."
+        ),
+        "API_KEY_INVALID": "The Firebase Web API key is invalid. Copy the apiKey from your Web app config again.",
+        "INVALID_API_KEY": "The Firebase Web API key is invalid. Copy the apiKey from your Web app config again.",
+        "PROJECT_NOT_FOUND": "Firebase could not find this project. Check FIREBASE_PROJECT_ID in .env.",
+        "ADMIN_ONLY_OPERATION": "Account creation is disabled for this Firebase project.",
     }
-    return messages.get(code, "Firebase could not complete this request. Please try again.")
+    return messages.get(code, f"Firebase error: {code or 'unknown error'}")
 
 
 def _firebase_request(endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
