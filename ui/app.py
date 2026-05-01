@@ -7,11 +7,17 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
 import streamlit as st
+from auth import require_login
+
+import streamlit as st
 from app.orchestrator import answer_query as orchestrator_answer_query
 
 
 st.set_page_config(page_title="SNTI AI Assistant", page_icon="🤖", layout="wide")
-from auth import require_login, logout_link
+from auth import require_login
+
+current_user = require_login("LLM Chatbot")
+
 
 current_user = require_login("SNTI AI Assistant")
 auth_user_id = current_user.get("user_id") or current_user.get("username", "anonymous")
