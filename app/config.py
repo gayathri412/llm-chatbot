@@ -40,6 +40,9 @@ def _env_int(name: str, default: int) -> int:
 class AppSettings(BaseModel):
     groq_api_key: str | None = Field(default=None)
     gemini_api_key: str | None = Field(default=None)
+    auth_provider: str = Field(default="firebase")
+    firebase_web_api_key: str | None = Field(default=None)
+    firebase_project_id: str | None = Field(default=None)
 
     gcp_project_id: str | None = Field(default=None)
     gcp_location: str = Field(default="US")
@@ -80,6 +83,9 @@ class AppSettings(BaseModel):
         return cls(
             groq_api_key=os.getenv("GROQ_API_KEY") or None,
             gemini_api_key=os.getenv("GEMINI_API_KEY") or None,
+            auth_provider=os.getenv("AUTH_PROVIDER", "firebase"),
+            firebase_web_api_key=os.getenv("FIREBASE_WEB_API_KEY") or None,
+            firebase_project_id=os.getenv("FIREBASE_PROJECT_ID") or None,
             gcp_project_id=os.getenv("GCP_PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT") or None,
             gcp_location=os.getenv("GCP_LOCATION", "US"),
             cache_enabled=_env_bool("CACHE_ENABLED", "true"),
@@ -112,7 +118,7 @@ class AppSettings(BaseModel):
         )
 
     def public_dict(self) -> dict[str, Any]:
-        hidden = {"groq_api_key", "gemini_api_key", "redis_password"}
+        hidden = {"groq_api_key", "gemini_api_key", "firebase_web_api_key", "redis_password"}
         return {
             key: ("***" if key in hidden and value else value)
             for key, value in self.__dict__.items()

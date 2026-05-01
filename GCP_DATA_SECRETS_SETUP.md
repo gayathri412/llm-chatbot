@@ -34,6 +34,7 @@ gcloud services enable storage.googleapis.com --project eco-precept-466120-v0
 gcloud services enable bigquery.googleapis.com --project eco-precept-466120-v0
 gcloud services enable secretmanager.googleapis.com --project eco-precept-466120-v0
 gcloud services enable logging.googleapis.com --project eco-precept-466120-v0
+gcloud services enable identitytoolkit.googleapis.com --project eco-precept-466120-v0
 ```
 
 Secret Manager can require billing to enable. If billing is not enabled, keep `SECRET_MANAGER_ENABLED=false` and use your local `.env` file for development.
@@ -134,6 +135,7 @@ Create secrets:
 ```powershell
 gcloud secrets create groq-api-key --project eco-precept-466120-v0
 gcloud secrets create gemini-api-key --project eco-precept-466120-v0
+gcloud secrets create firebase-web-api-key --project eco-precept-466120-v0
 ```
 
 Add secret versions:
@@ -144,12 +146,21 @@ gcloud secrets versions add groq-api-key --project eco-precept-466120-v0 --data-
 
 Set-Content -Path gemini_key.txt -Value "YOUR_GEMINI_API_KEY" -NoNewline
 gcloud secrets versions add gemini-api-key --project eco-precept-466120-v0 --data-file gemini_key.txt
+
+Set-Content -Path firebase_key.txt -Value "YOUR_FIREBASE_WEB_API_KEY" -NoNewline
+gcloud secrets versions add firebase-web-api-key --project eco-precept-466120-v0 --data-file firebase_key.txt
 ```
 
 Inject secrets into Cloud Run instead of writing keys in code:
 
 ```powershell
 gcloud run deploy snti-ai-assistant --project eco-precept-466120-v0 --region asia-south1 --service-account snti-chatbot-runtime-sa@eco-precept-466120-v0.iam.gserviceaccount.com --set-secrets GROQ_API_KEY=groq-api-key:latest,GEMINI_API_KEY=gemini-api-key:latest --set-env-vars SECRET_MANAGER_ENABLED=false,PII_REDACTION_ENABLED=true,AUDIT_PROMPT_PREVIEW_ENABLED=false
+```
+
+For Firebase Authentication, also inject the Firebase Web API key:
+
+```powershell
+gcloud run deploy snti-ai-assistant --project eco-precept-466120-v0 --region asia-south1 --service-account snti-chatbot-runtime-sa@eco-precept-466120-v0.iam.gserviceaccount.com --set-secrets FIREBASE_WEB_API_KEY=firebase-web-api-key:latest --set-env-vars AUTH_PROVIDER=firebase,FIREBASE_PROJECT_ID=eco-precept-466120-v0
 ```
 
 If your code should read Secret Manager directly at runtime, keep `SECRET_MANAGER_ENABLED=true` and grant `roles/secretmanager.secretAccessor` to the runtime service account.
@@ -160,6 +171,10 @@ If your code should read Secret Manager directly at runtime, keep `SECRET_MANAGE
 GCP_PROJECT_ID=eco-precept-466120-v0
 GCP_LOCATION=asia-south1
 GCS_STAGING_BUCKET=eco-precept-466120-v0-snti-staging
+
+AUTH_PROVIDER=firebase
+FIREBASE_WEB_API_KEY=your_firebase_web_api_key
+FIREBASE_PROJECT_ID=eco-precept-466120-v0
 
 BIGQUERY_CONTEXT_DATASET=analytics
 BIGQUERY_CONTEXT_TABLE=chat_context_docs

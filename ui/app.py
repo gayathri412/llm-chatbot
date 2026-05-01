@@ -14,7 +14,7 @@ st.set_page_config(page_title="SNTI AI Assistant", page_icon="🤖", layout="wid
 from auth import require_login, logout_link
 
 current_user = require_login("SNTI AI Assistant")
-auth_user_id = current_user.get("username", "anonymous")
+auth_user_id = current_user.get("user_id") or current_user.get("username", "anonymous")
 
 
 def answer_query(query, model_choice="Llama", **kwargs):
