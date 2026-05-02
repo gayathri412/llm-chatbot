@@ -624,13 +624,29 @@ def _render_auth_styles() -> None:
         [data-testid="block-container"] {
             max-width: 100% !important;
             padding: 0 !important;
+            margin: 0 !important;
+        }
+        
+        /* Remove Streamlit app margins */
+        .stApp > header + div {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
+        [data-testid="stAppViewContainer"] {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100vw !important;
+            max-width: 100vw !important;
         }
         
         /* Main auth container - split layout */
         .auth-container {
-            display: flex;
+            display: flex !important;
+            flex-direction: row !important;
             min-height: 100vh;
             width: 100%;
+            max-width: 100vw;
         }
         
         /* Left panel - dark */
@@ -755,13 +771,13 @@ def _render_auth_styles() -> None:
         
         /* Right panel - white */
         .auth-right {
-            flex: 1;
+            flex: 0 0 520px;
             background: #ffffff;
             display: flex;
             flex-direction: column;
             justify-content: center;
             padding: 60px 80px;
-            max-width: 520px;
+            width: 520px;
             min-height: 100vh;
             box-shadow: -4px 0 24px rgba(0,0,0,0.03);
         }
