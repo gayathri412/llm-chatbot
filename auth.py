@@ -477,6 +477,30 @@ def _render_auth_styles() -> None:
             text-align: center;
             text-decoration: none !important;
         }
+        .auth-social-label {
+            color: #aaa;
+            font-size: 14px;
+            margin: 14px 0 8px;
+        }
+        .auth-social-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-height: 46px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid #333;
+            background: #1c1c1c;
+            color: #f0f0f0;
+            font-weight: 700;
+            cursor: not-allowed;
+            font-family: inherit;
+            font-size: 15px;
+        }
+        .auth-social-btn:hover {
+            border-color: #00c2ff;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -637,6 +661,28 @@ def _render_reset_password_form() -> None:
             st.success("Password reset email sent.")
 
 
+
+def _render_social_auth_buttons(label: str) -> None:
+    st.divider()
+    st.markdown(
+        f'<p class="auth-social-label">{html.escape(label)}</p>',
+        unsafe_allow_html=True,
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown(
+            '<button class="auth-social-btn" disabled>Continue with Google</button>',
+            unsafe_allow_html=True,
+        )
+
+    with col2:
+        st.markdown(
+            '<button class="auth-social-btn" disabled>Continue with GitHub</button>',
+            unsafe_allow_html=True,
+        )
+
 def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
     if st.query_params.get("logout") == "1":
         _clear_auth_session()
@@ -666,35 +712,11 @@ def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
 
     with sign_in_tab:
         _render_sign_in_form()
-
-        st.divider()
-        st.write("Or continue with")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if st.button("Continue with Google", use_container_width=True, key="google_sign_in"):
-                st.info("Google sign-in needs OAuth setup.")
-
-        with col2:
-            if st.button("Continue with GitHub", use_container_width=True, key="github_sign_in"):
-                st.info("GitHub sign-in needs OAuth setup.")
+        _render_social_auth_buttons("Or continue with")
 
     with create_tab:
         _render_create_account_form()
-
-        st.divider()
-        st.write("Or create with")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if st.button("Continue with Google", use_container_width=True, key="google_create"):
-                st.info("Google sign-in needs OAuth setup.")
-
-        with col2:
-            if st.button("Continue with GitHub", use_container_width=True, key="github_create"):
-                st.info("GitHub sign-in needs OAuth setup.")
+        _render_social_auth_buttons("Or create with")
 
     with reset_tab:
         _render_reset_password_form()
