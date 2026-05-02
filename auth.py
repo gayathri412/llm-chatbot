@@ -624,20 +624,6 @@ def _render_create_account_form() -> None:
             st.rerun()
 
 
-def _render_reset_password_form() -> None:
-    with st.form("firebase_reset_password_form"):
-        email = st.text_input("Account email", placeholder="you@example.com")
-        submitted = st.form_submit_button("Send reset email", use_container_width=True)
-
-    if submitted:
-        try:
-            _send_password_reset(email.strip())
-        except (FirebaseAuthError, FirebaseConfigError) as exc:
-            st.error(str(exc))
-        else:
-            st.success("Password reset email sent.")
-
-
 def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
     if st.query_params.get("logout") == "1":
         _clear_auth_session()
