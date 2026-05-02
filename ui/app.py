@@ -100,7 +100,8 @@ button[kind="header"],
 [data-testid="stFileUploader"] {
     position: fixed !important;
     bottom: 57px !important;
-    left: 72px !important;
+    left: auto !important;
+    right: 184px !important;
     right: auto !important;
     z-index: 1103 !important;
     width: 34px !important;
@@ -376,7 +377,8 @@ button[kind="header"],
     border-radius: 12px;
     box-shadow: 0 0 12px rgba(0,0,0,0.4);
     min-height: 38px !important;
-    padding-left: 126px !important;
+    padding-left: 0 !important;
+    padding-right: 164px !important;
 }
 [data-testid="stChatInput"] > div:focus-within {
     border-color: var(--accent) !important;
@@ -511,7 +513,8 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 [data-testid="stSelectbox"] {
     position: fixed !important;
     bottom: 58px !important;
-    left: 112px !important;
+    left: auto !important;
+    right: 80px !important;
     z-index: 1102 !important;
     width: 88px !important;
     opacity: 0 !important;     /* invisible but clickable */
@@ -538,12 +541,12 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
     pointer-events: none;
 }
 .chat-inline-folder {
-    left: 72px;
+    right: 184px;
     width: 32px;
     font-size: 16px;
 }
 .chat-inline-model {
-    left: 112px;
+    right: 80px;
     width: 88px;
     gap: 5px;
 }
