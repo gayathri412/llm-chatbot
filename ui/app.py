@@ -100,8 +100,7 @@ button[kind="header"],
 [data-testid="stFileUploader"] {
     position: fixed !important;
     bottom: 18px !important;
-    left: auto !important;
-    right: 158px !important;
+    left: min(920px, calc(100vw - 198px)) !important;
     right: auto !important;
     z-index: 1103 !important;
     width: 30px !important;
@@ -352,7 +351,7 @@ button[kind="header"],
 
 /* ── CHAT MESSAGES ── */
 .chat-wrap { max-width: 800px; }
-.chat-bottom-spacer { height: 150px; }
+.chat-bottom-spacer { height: 96px; }
 
 /* Dark chat bubbles */
 [data-testid="stChatMessage"] {
@@ -367,7 +366,7 @@ button[kind="header"],
     position: fixed !important; bottom: 9px !important;
     left: 54px !important; right: 0 !important;
     background: var(--bg-surface) !important;
-    padding: 2px 32px 2px !important;
+    padding: 1px 32px 1px !important;
     border-top: none !important;
     z-index: 1000;
 }
@@ -379,7 +378,8 @@ button[kind="header"],
     box-shadow: 0 0 12px rgba(0,0,0,0.4);
     min-height: 30px !important;
     padding-left: 0 !important;
-    padding-right: 170px !important;
+    padding-right: 4px !important;
+    position: relative !important;
 }
 [data-testid="stChatInput"] > div:focus-within {
     border-color: var(--accent) !important;
@@ -393,6 +393,7 @@ button[kind="header"],
     max-height: 58px !important;
     padding-top: 2px !important;
     padding-bottom: 2px !important;
+    padding-right: 134px !important;
     font-size: 14px !important;
 }
 [data-testid="stChatInput"] textarea::placeholder {
@@ -468,7 +469,7 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* Push page content above pinned input */
-.main .block-container { padding-bottom: 160px !important; padding-top: 10px !important; }
+.main .block-container { padding-bottom: 112px !important; padding-top: 10px !important; }
 
 /* ── BOTTOM TOOLBAR STRIP ── */
 .snti-toolbar {
@@ -507,10 +508,11 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 [data-testid="stSelectbox"] {
     position: fixed !important;
     bottom: 18px !important;
-    left: auto !important;
+    left: min(956px, calc(100vw - 162px)) !important;
     right: 56px !important;
+    right: auto !important;
     z-index: 1102 !important;
-    width: 88px !important;
+    width: 92px !important;
     opacity: 0 !important;     /* invisible but clickable */
     height: 28px !important;
 }
@@ -535,12 +537,12 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
     pointer-events: none;
 }
 .chat-inline-folder {
-    right: 158px;
+    left: min(920px, calc(100vw - 198px));
     width: 30px;
     font-size: 14px;
 }
 .chat-inline-model {
-    right: 56px;
+    left: min(956px, calc(100vw - 162px));
     width: 92px;
     gap: 5px;
 }
