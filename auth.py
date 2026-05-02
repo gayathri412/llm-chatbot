@@ -636,13 +636,14 @@ def _render_auth_styles() -> None:
         /* Left panel - dark */
         .auth-left {
             flex: 1;
-            background: #1a1a2e;
+            background: #f8f6f3;
             display: flex;
             flex-direction: column;
             justify-content: center;
             padding: 60px 80px;
             position: relative;
             overflow: hidden;
+            min-height: 100vh;
         }
         
         .auth-left::before {
@@ -652,7 +653,7 @@ def _render_auth_styles() -> None:
             left: 0;
             right: 0;
             height: 200px;
-            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%239D174D' fill-opacity='0.1' d='M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") no-repeat bottom;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%239D174D' fill-opacity='0.08' d='M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") no-repeat bottom;
             background-size: cover;
         }
         
@@ -666,39 +667,41 @@ def _render_auth_styles() -> None:
         }
         
         .auth-logo-icon {
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
             background: #9D174D;
-            border-radius: 10px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
+            font-size: 22px;
         }
         
         .auth-logo-text {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 700;
             color: #9D174D;
+            letter-spacing: -0.5px;
         }
         
         .auth-welcome {
             max-width: 420px;
             position: relative;
             z-index: 1;
+            margin-top: 40px;
         }
         
         .auth-welcome-label {
             color: #9D174D;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
-            letter-spacing: 1.5px;
+            letter-spacing: 2px;
             text-transform: uppercase;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
         
         .auth-welcome h1 {
-            color: #1a1a2e;
+            color: #1e1b4b;
             font-size: 36px;
             font-weight: 700;
             margin: 0 0 16px 0;
@@ -706,7 +709,7 @@ def _render_auth_styles() -> None:
         }
         
         .auth-welcome p {
-            color: #666;
+            color: #6b7280;
             font-size: 15px;
             line-height: 1.6;
             margin: 0 0 40px 0;
@@ -725,28 +728,29 @@ def _render_auth_styles() -> None:
         }
         
         .auth-feature-icon {
-            width: 44px;
-            height: 44px;
-            background: rgba(157, 23, 77, 0.1);
+            width: 48px;
+            height: 48px;
+            background: rgba(157, 23, 77, 0.08);
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
+            font-size: 22px;
             flex-shrink: 0;
         }
         
         .auth-feature-text h3 {
-            color: #1a1a2e;
-            font-size: 14px;
+            color: #1e1b4b;
+            font-size: 15px;
             font-weight: 600;
             margin: 0 0 4px 0;
         }
         
         .auth-feature-text p {
-            color: #888;
-            font-size: 13px;
+            color: #9ca3af;
+            font-size: 14px;
             margin: 0;
+            line-height: 1.4;
         }
         
         /* Right panel - white */
@@ -758,6 +762,12 @@ def _render_auth_styles() -> None:
             justify-content: center;
             padding: 60px 80px;
             max-width: 560px;
+            min-height: 100vh;
+        }
+        
+        /* Ensure Streamlit tabs work properly */
+        .auth-right .stTabs {
+            width: 100%;
         }
         
         .auth-tabs {
