@@ -584,7 +584,7 @@ def _render_oidc_sign_in(app_name: str) -> None:
 
 
 def _render_sign_in_form() -> None:
-    with st.form("firebase_sign_in_form", "firebase_sign_in_form", key="auth_sign_in_form"):
+    with st.form(key="auth_sign_in_form"):
         email = st.text_input("Email", placeholder="you@example.com")
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Sign in", use_container_width=True)
