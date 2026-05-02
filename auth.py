@@ -584,7 +584,7 @@ def _render_oidc_sign_in(app_name: str) -> None:
 
 
 def _render_sign_in_form() -> None:
-    with st.form("firebase_sign_in_form"):
+    with st.form("firebase_sign_in_form", key="auth_sign_in_form"):
         email = st.text_input("Email", placeholder="you@example.com")
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Sign in", use_container_width=True)
@@ -600,7 +600,7 @@ def _render_sign_in_form() -> None:
 
 
 def _render_create_account_form() -> None:
-    with st.form("firebase_create_account_form"):
+    with st.form("firebase_create_account_form", key="auth_create_form"):
         display_name = st.text_input("Display name", placeholder="Your name")
         email = st.text_input("Email", placeholder="you@example.com")
         password = st.text_input("Password", type="password")
@@ -624,7 +624,7 @@ def _render_create_account_form() -> None:
             st.rerun()
 
 def _render_reset_password_form() -> None:
-    with st.form("firebase_reset_password_form"):
+    with st.form("firebase_reset_password_form", key="auth_reset_form"):
         email = st.text_input("Account email", placeholder="you@example.com")
         submitted = st.form_submit_button("Send reset email", use_container_width=True)
 
