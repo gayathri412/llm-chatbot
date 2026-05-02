@@ -99,12 +99,12 @@ button[kind="header"],
 /* ── FILE UPLOADER — overlaid on the + button in bottom toolbar ── */
 [data-testid="stFileUploader"] {
     position: fixed !important;
-    bottom: 4px !important;
-    left: 62px !important;
+    bottom: 57px !important;
+    left: 72px !important;
     right: auto !important;
-    z-index: 1100 !important;
-    width: 44px !important;
-    height: 44px !important;
+    z-index: 1103 !important;
+    width: 34px !important;
+    height: 34px !important;
 }
 /* Keep the section visible but transparent so it stays clickable */
 [data-testid="stFileUploader"] section {
@@ -112,8 +112,8 @@ button[kind="header"],
     background: transparent !important;
     padding: 0 !important;
     min-height: unset !important;
-    width: 44px !important;
-    height: 44px !important;
+    width: 34px !important;
+    height: 34px !important;
 }
 [data-testid="stFileUploaderDropzoneInstructions"],
 [data-testid="stFileUploader"] span,
@@ -126,9 +126,9 @@ button[kind="header"],
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-    min-height: 44px !important;
-    width: 44px !important;
-    height: 44px !important;
+    min-height: 34px !important;
+    width: 34px !important;
+    height: 34px !important;
     cursor: pointer !important;
     opacity: 0 !important;   /* invisible but fully clickable */
 }
@@ -137,9 +137,9 @@ button[kind="header"],
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 38px !important;
-    height: 38px !important;
-    border-radius: 10px !important;
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 8px !important;
     background: transparent !important;
     border: none !important;
     font-size: 0px !important;          /* hide button text */
@@ -365,7 +365,7 @@ button[kind="header"],
     position: fixed !important; bottom: 48px !important;
     left: 54px !important; right: 0 !important;
     background: var(--bg-surface) !important;
-    padding: 6px 32px 6px !important;
+    padding: 4px 32px 4px !important;
     border-top: none !important;
     z-index: 1000;
 }
@@ -373,9 +373,10 @@ button[kind="header"],
     max-width: 800px;
     background: var(--bg-card) !important;
     border: 1px solid var(--border) !important;
-    border-radius: 14px;
+    border-radius: 12px;
     box-shadow: 0 0 12px rgba(0,0,0,0.4);
-    min-height: 44px !important;
+    min-height: 38px !important;
+    padding-left: 126px !important;
 }
 [data-testid="stChatInput"] > div:focus-within {
     border-color: var(--accent) !important;
@@ -385,8 +386,10 @@ button[kind="header"],
     background: transparent !important;
     color: var(--text-primary) !important;
     caret-color: var(--accent) !important;
-    min-height: 38px !important;
-    max-height: 96px !important;
+    min-height: 30px !important;
+    max-height: 80px !important;
+    padding-top: 6px !important;
+    padding-bottom: 4px !important;
 }
 [data-testid="stChatInput"] textarea::placeholder {
     color: var(--text-dim) !important;
@@ -394,8 +397,11 @@ button[kind="header"],
 /* Send arrow button inside chat input */
 [data-testid="stChatInput"] button {
     background: linear-gradient(135deg, #0077b6, #00c2ff) !important;
-    border-radius: 10px !important;
+    border-radius: 9px !important;
     color: #000 !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
 }
 
 /* ── SELECTBOX / DROPDOWNS ── */
@@ -504,15 +510,47 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 /* Model selectbox — overlaid on .t-model area, transparent */
 [data-testid="stSelectbox"] {
     position: fixed !important;
-    bottom: 5px !important;
+    bottom: 58px !important;
     left: 112px !important;
     z-index: 1102 !important;
-    width: 180px !important;
+    width: 88px !important;
     opacity: 0 !important;     /* invisible but clickable */
-    height: 36px !important;
+    height: 32px !important;
 }
 [data-testid="stSelectbox"] > div {
-    height: 36px !important;
+    height: 32px !important;
+}
+
+/* Visible inline controls inside the chat input */
+.chat-inline-control {
+    position: fixed;
+    bottom: 57px;
+    z-index: 1101;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    font-size: 13px;
+    pointer-events: none;
+}
+.chat-inline-folder {
+    left: 72px;
+    width: 32px;
+    font-size: 16px;
+}
+.chat-inline-model {
+    left: 112px;
+    width: 88px;
+    gap: 5px;
+}
+.chat-inline-model strong {
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 600;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -617,6 +655,15 @@ if "current_chat" not in st.session_state:
 # Model selector pinned to header area
 model_choice = st.selectbox("Model", ["Auto", "Llama", "Gemini"], index=1, label_visibility="collapsed",
                              key="model_select")
+st.markdown(
+    f"""
+    <div class="chat-inline-control chat-inline-folder" title="Upload files">F</div>
+    <div class="chat-inline-control chat-inline-model" title="Switch model">
+      <strong>{model_choice}</strong><span>▾</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ---------- PAGE ROUTING ----------
 page = st.session_state.page
