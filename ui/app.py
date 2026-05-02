@@ -49,7 +49,7 @@ page = st.sidebar.selectbox(
 )
 
 if page == "Home":
-    st.title("Home Page")
+    render_charts_page(model_choice, answer_query)
 
 elif page == "Charts":
     render_charts_page(model_choice, answer_query)
