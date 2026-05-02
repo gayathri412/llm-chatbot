@@ -16,7 +16,7 @@ from app.orchestrator import answer_query as orchestrator_answer_query
 from app.appwrite_storage import AppwriteStorageError
 from app.firebase_storage import FirebaseStorageError
 from app.upload_storage import UploadStorageError, storage_backend, upload_streamlit_file
-from analysis import render_charts_page
+
 
 
 model_choice = st.sidebar.selectbox(
