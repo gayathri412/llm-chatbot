@@ -17,7 +17,7 @@ from app.appwrite_storage import AppwriteStorageError
 from app.firebase_storage import FirebaseStorageError
 from app.upload_storage import UploadStorageError, storage_backend, upload_streamlit_file
 
-from analysis import render_charts_page
+
 
 # client setup here
 # model_choice setup here
@@ -97,6 +97,7 @@ def save_upload_to_firebase(uploaded_file, area: str) -> dict | None:
     st.caption(f"Saved to {stored.get('backend', backend).title()} Storage: `{stored['uri']}`")
     return stored
 
+from analysis import render_charts_page
 
 # ---------- GLOBAL ----------
 if "history" not in st.session_state:
