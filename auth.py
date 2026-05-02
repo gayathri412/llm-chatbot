@@ -623,6 +623,89 @@ def _render_create_account_form() -> None:
             _set_auth_session(user)
             st.rerun()
 
+def _render_reset_password_form() -> None:
+    with st.form("firebase_reset_password_form"):
+        email = st.text_input("Account email", placeholder="you@example.com")
+        submitted = st.form_submit_button("Send reset email", use_container_width=True)
+
+    if submitted:
+        try:
+            _send_password_reset(email.strip())
+        except (FirebaseAuthError, FirebaseConfigError) as exc:
+            st.error(str(exc))
+        else:
+            st.success("Password reset email sent.")
+
+
+def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
+    if st.query_params.get("logout") == "1":
+        _clear_auth_session()
+        st.query_params.clear()
+        st.rerun()
+
+    current_user = get_current_user()
+    if current_user:
+        return current_user
+
+    _render_auth_styles()
+
+    if _auth_provider() in {"oidc", "sso", "azure", "okta"}:
+        _render_oidc_sign_in(app_name)
+
+    if not _firebase_api_key():
+        _render_firebase_setup_message()
+
+    _render_auth_panel(
+        app_name,
+        "Sign in with Firebase Authentication, or create an account for this workspace.",
+    )
+
+    sign_in_tab, create_tab, reset_tab = st.tabs(
+        ["Sign in", "Create account", "Reset password"]
+    )
+
+    with sign_in_tab:
+        _render_sign_in_form()
+
+        st.divider()
+        st.write("Or continue with")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("Continue with Google", use_container_width=True, key="google_sign_in"):
+                st.info("Google sign-in needs OAuth setup.")
+
+        with col2:
+            if st.button("Continue with GitHub", use_container_width=True, key="github_sign_in"):
+                st.info("GitHub sign-in needs OAuth setup.")
+
+    with create_tab:
+        _render_create_account_form()
+
+        st.divider()
+        st.write("Or create with")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("Continue with Google", use_container_width=True, key="google_create"):
+                st.info("Google sign-in needs OAuth setup.")
+
+        with col2:
+            if st.button("Continue with GitHub", use_container_width=True, key="github_create"):
+                st.info("GitHub sign-in needs OAuth setup.")
+
+    with reset_tab:
+        _render_reset_password_form()
+
+    st.stop()
+
+
+def logout_link(label: str = "Logout") -> str:
+    return f'<a href="?logout=1" title="{label}" class="tda-icon-btn">{label}</a>'
+
+
 
 def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
     if st.query_params.get("logout") == "1":
