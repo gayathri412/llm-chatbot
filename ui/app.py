@@ -10,18 +10,24 @@ import streamlit as st
 from auth import require_login
 
 import streamlit as st
+from app.access_control import build_access_policy
+from app.config import get_settings
 from app.orchestrator import answer_query as orchestrator_answer_query
-from app.firebase_storage import FirebaseStorageError, upload_streamlit_file
+from app.appwrite_storage import AppwriteStorageError
+from app.firebase_storage import FirebaseStorageError
+from app.upload_storage import UploadStorageError, storage_backend, upload_streamlit_file
 
 
 st.set_page_config(page_title="SNTI AI Assistant", page_icon="🤖", layout="wide")
 
 current_user = require_login("SNTI AI Assistant")
 auth_user_id = current_user.get("user_id") or current_user.get("username", "anonymous")
+current_access_policy = build_access_policy(current_user, get_settings())
 
 
 def answer_query(query, model_choice="Llama", **kwargs):
     kwargs.setdefault("user_id", auth_user_id)
+    kwargs.setdefault("user_context", current_user)
     return orchestrator_answer_query(query, model_choice, **kwargs)
 
 
@@ -33,28 +39,29 @@ def save_upload_to_firebase(uploaded_file, area: str) -> dict | None:
         getattr(uploaded_file, "file_id", None)
         or f"{uploaded_file.name}:{getattr(uploaded_file, 'size', '')}"
     )
-    session_key = f"firebase_storage_upload:{area}:{file_key}"
+    backend = storage_backend()
+    session_key = f"upload_storage:{backend}:{area}:{file_key}"
 
     if session_key in st.session_state:
         stored = st.session_state[session_key]
         if stored.get("uri"):
-            st.caption(f"Saved to Firebase Storage: `{stored['uri']}`")
+            st.caption(f"Saved to {stored.get('backend', backend).title()} Storage: `{stored['uri']}`")
             return stored
         return None
 
     try:
         stored = upload_streamlit_file(uploaded_file, user_id=auth_user_id, area=area)
-    except FirebaseStorageError as exc:
+    except (AppwriteStorageError, FirebaseStorageError, UploadStorageError) as exc:
         st.session_state[session_key] = {"error": str(exc)}
-        st.warning(f"Firebase Storage upload skipped: {exc}")
+        st.warning(f"{backend.title()} Storage upload skipped: {exc}")
         return None
     except Exception as exc:
         st.session_state[session_key] = {"error": str(exc)}
-        st.warning(f"Firebase Storage upload failed: {exc}")
+        st.warning(f"{backend.title()} Storage upload failed: {exc}")
         return None
 
     st.session_state[session_key] = stored
-    st.caption(f"Saved to Firebase Storage: `{stored['uri']}`")
+    st.caption(f"Saved to {stored.get('backend', backend).title()} Storage: `{stored['uri']}`")
     return stored
 
 
@@ -604,7 +611,7 @@ if "current_chat" not in st.session_state:
 # ---------- NAV STATE ----------
 # The HTML sidebar icons above route by query parameter (?page=...).
 # Model selector pinned to header area
-model_choice = st.selectbox("Model", ["Llama", "Gemini"], label_visibility="collapsed",
+model_choice = st.selectbox("Model", ["Auto", "Llama", "Gemini"], index=1, label_visibility="collapsed",
                              key="model_select")
 
 # ---------- PAGE ROUTING ----------
@@ -1268,9 +1275,14 @@ elif page == "BigData":
 
             if st.button("🔗 Connect to BigQuery"):
                 try:
-                    client = BigQueryClient(project_id if project_id else None)
+                    client = BigQueryClient(
+                        project_id if project_id else None,
+                        access_policy=current_access_policy,
+                    )
                     st.session_state.bq_client = client
                     st.success(f"Connected to project: {client.project_id}")
+                    if current_access_policy.restricted:
+                        st.info("Your account is limited to approved context sources.")
                 except Exception as e:
                     st.error(f"Connection failed: {e}")
 

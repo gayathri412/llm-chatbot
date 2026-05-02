@@ -4,9 +4,13 @@ RAG_ANSWER_PROMPT = """Answer the user's question clearly and accurately.
 
 Instructions:
 - First use the retrieved context when it is relevant
+- Cite retrieved context with reference markers like [1] or by naming the title/source
 - If the context does not contain the answer, say that clearly and then use general knowledge
 - Do not invent facts that are not supported by the context
 - Keep explanation simple and clear
+
+Language and style:
+{language_instructions}
 
 User Question:
 {user_query}

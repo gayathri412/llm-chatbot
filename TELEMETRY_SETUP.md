@@ -3,8 +3,10 @@
 The chatbot now supports:
 
 - Redis or Google Cloud Memorystore cache for repeated answers.
+- Top-query tracking for repeated prompt analytics.
 - Cloud Logging for telemetry logs.
-- Optional BigQuery telemetry inserts.
+- Optional batched BigQuery telemetry inserts.
+- Token budget enforcement and automatic cheaper-model routing.
 
 The app still runs locally if Redis or Google Cloud credentials are not configured.
 
@@ -16,6 +18,7 @@ Add this to `.env`:
 CACHE_ENABLED=true
 REDIS_URL=redis://localhost:6379/0
 CACHE_TTL_SECONDS=3600
+TOP_QUERY_TRACKING_ENABLED=true
 ```
 
 ## Google Cloud Memorystore
@@ -103,6 +106,30 @@ GCP_PROJECT_ID=your-gcp-project-id
 BIGQUERY_TELEMETRY_ENABLED=true
 BIGQUERY_TELEMETRY_DATASET=analytics
 BIGQUERY_TELEMETRY_TABLE=chat_telemetry
+TELEMETRY_BATCH_ENABLED=true
+TELEMETRY_BATCH_SIZE=10
+TELEMETRY_FLUSH_INTERVAL_SECONDS=30
+```
+
+## Token And Model Optimization
+
+The app trims oversized prompts/context before model calls and caps model
+output length:
+
+```env
+MAX_INPUT_TOKENS=6000
+MAX_CONTEXT_TOKENS=2500
+MAX_OUTPUT_TOKENS=800
+```
+
+Automatic routing can send low-risk Gemini or Auto requests to the cheaper
+Llama path:
+
+```env
+MODEL_AUTO_ROUTING_ENABLED=true
+CHEAP_MODEL_CHOICE=Llama
+PREMIUM_MODEL_CHOICE=Gemini
+LOW_RISK_TOKEN_THRESHOLD=500
 ```
 
 ## Install Dependencies

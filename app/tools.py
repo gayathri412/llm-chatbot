@@ -29,7 +29,12 @@ maries = []
 
 from llm.client import chat_completion
 
-def file_analyzer_tool(text: str, model_choice="Llama"):
+def file_analyzer_tool(
+    text: str,
+    model_choice="Llama",
+    max_output_tokens: int | None = None,
+    language_instructions: str = "Respond in English with a concise, professional style.",
+):
 
     # 🔪 chunk
     chunk_size = 800
@@ -62,6 +67,8 @@ RULES:
 - Use bullet points
 - Keep it clean and readable
 - Do NOT write long paragraphs
+- Follow these language and style instructions:
+{language_instructions}
 
 Content:
 {content_to_analyze}
@@ -75,6 +82,6 @@ Final Output:
     ]
 
     try:
-        return chat_completion(messages, model_choice)
+        return chat_completion(messages, model_choice, max_output_tokens=max_output_tokens)
     except Exception as e:
         return f"Error analyzing file: {str(e)}"

@@ -4,6 +4,7 @@ venv/
 # Python cache files
 __pycache__/
 *.pyc
+.rag_index/
 
 # Environment variables (API keys)
 .env

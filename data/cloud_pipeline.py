@@ -29,6 +29,10 @@ DEFAULT_CONTEXT_SCHEMA = [
     {"name": "body", "type": "STRING", "mode": "REQUIRED"},
     {"name": "source", "type": "STRING", "mode": "NULLABLE"},
     {"name": "tags", "type": "STRING", "mode": "REPEATED"},
+    {"name": "allowed_roles", "type": "STRING", "mode": "REPEATED"},
+    {"name": "allowed_groups", "type": "STRING", "mode": "REPEATED"},
+    {"name": "sensitivity", "type": "STRING", "mode": "NULLABLE"},
+    {"name": "metadata", "type": "JSON", "mode": "NULLABLE"},
     {"name": "updated_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
     {"name": "ingestion_date", "type": "DATE", "mode": "REQUIRED"},
 ]
@@ -71,6 +75,17 @@ def _normalize_tags(value: Any) -> list[str]:
     return [str(value)]
 
 
+def _normalize_json_value(value: Any) -> Any:
+    if value is None:
+        return {}
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return {"value": value}
+    return value
+
+
 def normalize_json_documents(json_path: str | Path, source: str | None = None) -> list[dict[str, Any]]:
     path = Path(json_path)
     with path.open("r", encoding="utf-8") as file:
@@ -110,6 +125,10 @@ def normalize_json_documents(json_path: str | Path, source: str | None = None) -
             "body": str(body),
             "source": str(item.get("source") or source or path.name),
             "tags": _normalize_tags(item.get("tags")),
+            "allowed_roles": _normalize_tags(item.get("allowed_roles")),
+            "allowed_groups": _normalize_tags(item.get("allowed_groups")),
+            "sensitivity": str(item.get("sensitivity") or "internal"),
+            "metadata": _normalize_json_value(item.get("metadata")),
             "updated_at": updated_at,
             "ingestion_date": str(item.get("ingestion_date") or ingestion_date),
         }

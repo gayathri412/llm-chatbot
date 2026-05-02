@@ -28,6 +28,10 @@ title STRING
 body STRING REQUIRED
 tags ARRAY<STRING>
 source STRING
+allowed_roles ARRAY<STRING>
+allowed_groups ARRAY<STRING>
+sensitivity STRING
+metadata JSON
 updated_at TIMESTAMP
 ingestion_date DATE REQUIRED
 ```
@@ -52,7 +56,15 @@ Implemented:
 - Required-field validation for `body`/`content`/`text`.
 - Deduplication by `doc_id + updated_at`.
 - Tag normalization from list or comma-separated string.
+- Role/group allow-list normalization from list or comma-separated string.
+- Metadata preservation as a BigQuery JSON field.
 - JSON normalization into newline-delimited JSON.
+
+Reference input:
+
+```powershell
+python -m data.cloud_pipeline data/sample_context_schema.json
+```
 
 ## Optional Embeddings Table
 
@@ -91,3 +103,32 @@ Create it with:
 ```powershell
 python -m data.cloud_pipeline data/docs.json --ensure-embeddings-table
 ```
+
+## Local Embeddings Vector Search
+
+Implemented semantic retrieval using Gemini embeddings plus a persistent local
+vector index. This does not require Pinecone, PGVector, Vertex AI Vector Search,
+or Firebase Storage.
+
+Enable it in `.env`:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key
+RAG_USE_EMBEDDINGS=true
+RAG_EMBEDDING_MODEL=gemini-embedding-001
+RAG_VECTOR_INDEX_PATH=.rag_index/context_vectors.json
+```
+
+Build or refresh the vector index:
+
+```powershell
+python -m data.embedding_rag
+```
+
+Runtime retrieval order:
+
+```text
+BigQuery context if enabled -> Gemini vector index -> TF-IDF/keyword fallback
+```
+
+The generated `.rag_index/` folder is ignored by git because it is rebuildable.

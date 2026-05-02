@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
+from app.cache import answer_cache
 from app.config import get_settings
 from app.orchestrator import answer_query
 from prompts.compose import list_prompt_templates
@@ -11,10 +12,13 @@ from prompts.compose import list_prompt_templates
 
 class ChatRequest(BaseModel):
     query: str = Field(..., min_length=1)
-    model_choice: Literal["Llama", "Gemini"] = "Llama"
+    model_choice: Literal["Auto", "Llama", "Gemini"] = "Llama"
     temperature: float = Field(default=0.2, ge=0.0, le=1.0)
     include_trace: bool = False
     user_id: str = "api_user"
+    user_email: str | None = None
+    user_roles: list[str] = Field(default_factory=list)
+    user_groups: list[str] = Field(default_factory=list)
 
 
 class ChatResponse(BaseModel):
@@ -42,6 +46,11 @@ def prompts():
     return {"templates": list_prompt_templates()}
 
 
+@app.get("/cache/top")
+def top_cached_queries(limit: int = 10):
+    return {"queries": answer_cache.top_queries(limit)}
+
+
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
     result = answer_query(
@@ -50,6 +59,12 @@ def chat(request: ChatRequest):
         include_trace=request.include_trace,
         temperature=request.temperature,
         user_id=request.user_id,
+        user_context={
+            "user_id": request.user_id,
+            "email": request.user_email or "",
+            "roles": request.user_roles,
+            "groups": request.user_groups,
+        },
     )
 
     if isinstance(result, dict):

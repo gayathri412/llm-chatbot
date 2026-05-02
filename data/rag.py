@@ -13,6 +13,8 @@ except ImportError:
     TfidfVectorizer = None
     cosine_similarity = None
 
+from data.embedding_rag import search_vector_context
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SOURCES = ("docs.json", "sample.json")
@@ -29,6 +31,20 @@ def _env_bool(name: str, default: str = "false") -> bool:
 
 def _clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", str(text)).strip()
+
+
+def _normalize_sources(sources: set[str] | frozenset[str] | list[str] | tuple[str, ...] | None):
+    if sources is None:
+        return None
+    return {str(source).strip().lower() for source in sources if str(source).strip()}
+
+
+def _source_allowed(source: str | None, allowed_sources: set[str] | frozenset[str] | None) -> bool:
+    if allowed_sources is None:
+        return True
+    if not allowed_sources:
+        return False
+    return str(source or "").strip().lower() in allowed_sources
 
 
 def _tokenize(text: str) -> list[str]:
@@ -79,6 +95,7 @@ def _load_documents() -> tuple[dict[str, str], ...]:
 
             title = _clean_text(item.get("title", f"{source_name} #{index}"))
             body = _clean_text(item.get("body", item.get("content", item.get("text", ""))))
+            source = _clean_text(item.get("source", source_name))
 
             for chunk_index, chunk in enumerate(_chunk_text(body), start=1):
                 documents.append(
@@ -86,7 +103,7 @@ def _load_documents() -> tuple[dict[str, str], ...]:
                         "id": str(item.get("id", f"{source_name}-{index}-{chunk_index}")),
                         "title": title,
                         "body": chunk,
-                        "source": source_name,
+                        "source": source,
                     }
                 )
 
@@ -127,14 +144,33 @@ def _keyword_score(query: str, document: dict[str, str]) -> float:
     return coverage + density + phrase_bonus + title_bonus
 
 
-def retrieve_context(query: str, limit: int = 4, min_score: float = 0.03) -> list[dict[str, Any]]:
+def retrieve_context(
+    query: str,
+    limit: int = 4,
+    min_score: float = 0.03,
+    allowed_sources: set[str] | frozenset[str] | list[str] | tuple[str, ...] | None = None,
+) -> list[dict[str, Any]]:
     query = _clean_text(query)
     if not query:
         return []
 
+    allowed_sources = _normalize_sources(allowed_sources)
+    if allowed_sources is not None and not allowed_sources:
+        return []
+
+    bq_results = _fetch_bigquery_context(query, limit=limit, allowed_sources=allowed_sources)
     documents, vectorizer, matrix = _build_tfidf_index()
     if not documents:
-        return _fetch_bigquery_context(query, limit=limit)
+        return bq_results
+
+    vector_results = search_vector_context(
+        query,
+        documents,
+        limit=limit,
+        allowed_sources=allowed_sources,
+    )
+    if vector_results:
+        return _dedupe_results([*bq_results, *vector_results])[:limit]
 
     if vectorizer is not None and matrix is not None and cosine_similarity is not None:
         query_vector = vectorizer.transform([query])
@@ -151,6 +187,9 @@ def retrieve_context(query: str, limit: int = 4, min_score: float = 0.03) -> lis
             break
 
         doc = documents[index]
+        if not _source_allowed(doc.get("source"), allowed_sources):
+            continue
+
         results.append(
             {
                 "title": doc["title"],
@@ -164,18 +203,21 @@ def retrieve_context(query: str, limit: int = 4, min_score: float = 0.03) -> lis
         if len(results) >= limit:
             break
 
-    bq_results = _fetch_bigquery_context(query, limit=limit)
     return _dedupe_results([*bq_results, *results])[:limit]
 
 
-def _fetch_bigquery_context(query: str, limit: int = 4) -> list[dict[str, Any]]:
+def _fetch_bigquery_context(
+    query: str,
+    limit: int = 4,
+    allowed_sources: set[str] | frozenset[str] | None = None,
+) -> list[dict[str, Any]]:
     if not _env_bool("RAG_USE_BIGQUERY"):
         return []
 
     try:
         from data.bq_client import fetch_context_from_bq
 
-        rows = fetch_context_from_bq(query, limit=limit)
+        rows = fetch_context_from_bq(query, limit=limit, allowed_sources=allowed_sources)
     except Exception:
         return []
 

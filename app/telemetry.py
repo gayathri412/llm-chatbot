@@ -1,5 +1,7 @@
 import json
 import logging
+import atexit
+import threading
 import time
 from typing import Any
 
@@ -39,8 +41,15 @@ class TelemetryClient:
         self.bigquery_enabled = self.settings.bigquery_telemetry_enabled
         self.dataset = self.settings.bigquery_telemetry_dataset
         self.table = self.settings.bigquery_telemetry_table
+        self.batch_enabled = self.settings.telemetry_batch_enabled
+        self.batch_size = max(1, self.settings.telemetry_batch_size)
+        self.flush_interval_seconds = max(1, self.settings.telemetry_flush_interval_seconds)
         self._bq_client = None
+        self._buffer: list[dict[str, Any]] = []
+        self._last_flush = time.monotonic()
+        self._lock = threading.Lock()
         self._setup_cloud_logging()
+        atexit.register(self.flush)
 
     def _setup_cloud_logging(self) -> None:
         if not self.enabled or not self.cloud_logging_enabled:
@@ -80,16 +89,45 @@ class TelemetryClient:
         }
 
         logger.info("telemetry_event=%s", json.dumps(event, default=str))
-        self._insert_bigquery(event)
+        self._queue_bigquery(event)
 
-    def _insert_bigquery(self, event: dict[str, Any]) -> None:
+    def _queue_bigquery(self, event: dict[str, Any]) -> None:
+        if not self.batch_enabled:
+            self._insert_bigquery([event])
+            return
+
+        should_flush = False
+        with self._lock:
+            self._buffer.append(event)
+            elapsed = time.monotonic() - self._last_flush
+            should_flush = (
+                len(self._buffer) >= self.batch_size
+                or elapsed >= self.flush_interval_seconds
+            )
+
+        if should_flush:
+            self.flush()
+
+    def flush(self) -> None:
+        with self._lock:
+            if not self._buffer:
+                self._last_flush = time.monotonic()
+                return
+
+            events = list(self._buffer)
+            self._buffer.clear()
+            self._last_flush = time.monotonic()
+
+        self._insert_bigquery(events)
+
+    def _insert_bigquery(self, events: list[dict[str, Any]]) -> None:
         client = self._get_bq_client()
         if client is None:
             return
 
         table_id = f"{self.project_id}.{self.dataset}.{self.table}"
         try:
-            errors = client.insert_rows_json(table_id, [event])
+            errors = client.insert_rows_json(table_id, events)
             if errors:
                 logger.warning("BigQuery telemetry insert failed: %s", errors)
         except Exception as exc:

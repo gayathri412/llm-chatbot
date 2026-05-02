@@ -22,11 +22,16 @@ def build_sql_explanation_prompt(sql_query: str) -> list[dict]:
 def build_tool_selection_prompt(query: str) -> list[dict]:
     return prompt_manager.compose("tool_selector", query=query)
 
-def build_rag_answer_prompt(user_query: str, context: str) -> list[dict]:
+def build_rag_answer_prompt(
+    user_query: str,
+    context: str,
+    language_instructions: str = "Respond in English with a concise, professional style.",
+) -> list[dict]:
     return prompt_manager.compose(
         "rag_answer",
         user_query=user_query,
         context=context or NO_CONTEXT_MESSAGE,
+        language_instructions=language_instructions,
     )
 
 def list_prompt_templates() -> list[str]:

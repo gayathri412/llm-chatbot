@@ -1,6 +1,6 @@
 # prompts/assistant.py
 RESPONSE_STYLE = """Use bullet points for steps, keep answers under 200 words unless asked for more.
-When you use context, reference title/source if provided.
+When you use retrieved context, include at least one reference marker like [1] or the title/source.
 """
 
 BIGDATA_ANALYSIS_STYLE = """Analyze the data results and provide:
