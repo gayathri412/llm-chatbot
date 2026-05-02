@@ -350,6 +350,7 @@ button[kind="header"],
 
 /* ── CHAT MESSAGES ── */
 .chat-wrap { max-width: 800px; }
+.chat-bottom-spacer { height: 150px; }
 
 /* Dark chat bubbles */
 [data-testid="stChatMessage"] {
@@ -361,10 +362,10 @@ button[kind="header"],
 
 /* ── BOTTOM INPUT BAR (stChatInput) — sits ABOVE the toolbar ── */
 [data-testid="stChatInput"] {
-    position: fixed !important; bottom: 46px !important;
+    position: fixed !important; bottom: 48px !important;
     left: 54px !important; right: 0 !important;
     background: var(--bg-surface) !important;
-    padding: 10px 32px 8px !important;
+    padding: 6px 32px 6px !important;
     border-top: none !important;
     z-index: 1000;
 }
@@ -374,6 +375,7 @@ button[kind="header"],
     border: 1px solid var(--border) !important;
     border-radius: 14px;
     box-shadow: 0 0 12px rgba(0,0,0,0.4);
+    min-height: 44px !important;
 }
 [data-testid="stChatInput"] > div:focus-within {
     border-color: var(--accent) !important;
@@ -383,6 +385,8 @@ button[kind="header"],
     background: transparent !important;
     color: var(--text-primary) !important;
     caret-color: var(--accent) !important;
+    min-height: 38px !important;
+    max-height: 96px !important;
 }
 [data-testid="stChatInput"] textarea::placeholder {
     color: var(--text-dim) !important;
@@ -454,7 +458,7 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* Push page content above pinned input */
-.main .block-container { padding-bottom: 200px !important; padding-top: 10px !important; }
+.main .block-container { padding-bottom: 240px !important; padding-top: 10px !important; }
 
 /* ── BOTTOM TOOLBAR STRIP ── */
 .snti-toolbar {
@@ -729,6 +733,7 @@ if page == "Chat":
                         st.dataframe(sources, use_container_width=True)
                     else:
                         st.info("No retrieved context was used.")
+    st.markdown('<div class="chat-bottom-spacer"></div>', unsafe_allow_html=True)
     # ---------- INPUT ----------
     user_input = st.chat_input("Ask anything...", key="main_chat")
 
