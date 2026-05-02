@@ -99,13 +99,13 @@ button[kind="header"],
 /* ── FILE UPLOADER — overlaid on the + button in bottom toolbar ── */
 [data-testid="stFileUploader"] {
     position: fixed !important;
-    bottom: 57px !important;
+    bottom: 18px !important;
     left: auto !important;
-    right: 184px !important;
+    right: 158px !important;
     right: auto !important;
     z-index: 1103 !important;
-    width: 34px !important;
-    height: 34px !important;
+    width: 30px !important;
+    height: 30px !important;
 }
 /* Keep the section visible but transparent so it stays clickable */
 [data-testid="stFileUploader"] section {
@@ -113,8 +113,8 @@ button[kind="header"],
     background: transparent !important;
     padding: 0 !important;
     min-height: unset !important;
-    width: 34px !important;
-    height: 34px !important;
+    width: 30px !important;
+    height: 30px !important;
 }
 [data-testid="stFileUploaderDropzoneInstructions"],
 [data-testid="stFileUploader"] span,
@@ -127,9 +127,9 @@ button[kind="header"],
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-    min-height: 34px !important;
-    width: 34px !important;
-    height: 34px !important;
+    min-height: 30px !important;
+    width: 30px !important;
+    height: 30px !important;
     cursor: pointer !important;
     opacity: 0 !important;   /* invisible but fully clickable */
 }
@@ -148,16 +148,17 @@ button[kind="header"],
     cursor: pointer !important;
     position: relative !important;
     transition: background 0.2s !important;
+    opacity: 0 !important;
 }
 /* Inject a 📎 emoji via pseudo-element */
 [data-testid="stFileUploader"] button::before {
     content: '📎' !important;
-    font-size: 20px !important;
+    font-size: 0 !important;
     color: #555 !important;
     display: block !important;
 }
 [data-testid="stFileUploader"] button:hover {
-    background: #e8f0fe !important;
+    background: transparent !important;
 }
 [data-testid="stFileUploader"] button:hover::before {
     color: #003087 !important;
@@ -363,22 +364,22 @@ button[kind="header"],
 
 /* ── BOTTOM INPUT BAR (stChatInput) — sits ABOVE the toolbar ── */
 [data-testid="stChatInput"] {
-    position: fixed !important; bottom: 48px !important;
+    position: fixed !important; bottom: 9px !important;
     left: 54px !important; right: 0 !important;
     background: var(--bg-surface) !important;
-    padding: 4px 32px 4px !important;
+    padding: 2px 32px 2px !important;
     border-top: none !important;
     z-index: 1000;
 }
 [data-testid="stChatInput"] > div {
-    max-width: 800px;
+    max-width: 1000px;
     background: var(--bg-card) !important;
     border: 1px solid var(--border) !important;
     border-radius: 12px;
     box-shadow: 0 0 12px rgba(0,0,0,0.4);
-    min-height: 38px !important;
+    min-height: 30px !important;
     padding-left: 0 !important;
-    padding-right: 164px !important;
+    padding-right: 170px !important;
 }
 [data-testid="stChatInput"] > div:focus-within {
     border-color: var(--accent) !important;
@@ -388,10 +389,11 @@ button[kind="header"],
     background: transparent !important;
     color: var(--text-primary) !important;
     caret-color: var(--accent) !important;
-    min-height: 30px !important;
-    max-height: 80px !important;
-    padding-top: 6px !important;
-    padding-bottom: 4px !important;
+    min-height: 22px !important;
+    max-height: 58px !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+    font-size: 14px !important;
 }
 [data-testid="stChatInput"] textarea::placeholder {
     color: var(--text-dim) !important;
@@ -401,9 +403,9 @@ button[kind="header"],
     background: linear-gradient(135deg, #0077b6, #00c2ff) !important;
     border-radius: 9px !important;
     color: #000 !important;
-    width: 34px !important;
-    height: 34px !important;
-    min-height: 34px !important;
+    width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
 }
 
 /* ── SELECTBOX / DROPDOWNS ── */
@@ -466,19 +468,11 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* Push page content above pinned input */
-.main .block-container { padding-bottom: 240px !important; padding-top: 10px !important; }
+.main .block-container { padding-bottom: 160px !important; padding-top: 10px !important; }
 
 /* ── BOTTOM TOOLBAR STRIP ── */
 .snti-toolbar {
-    position: fixed;
-    bottom: 0; left: 54px; right: 0;
-    height: 46px;
-    background: var(--bg-surface);
-    border-top: 1px solid var(--border);
-    display: flex; align-items: center;
-    padding: 0 20px 0 16px;
-    z-index: 1001;
-    gap: 8px;
+    display: none !important;
 }
 .t-plus {
     width: 32px; height: 32px; border-radius: 8px;
@@ -512,24 +506,24 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 /* Model selectbox — overlaid on .t-model area, transparent */
 [data-testid="stSelectbox"] {
     position: fixed !important;
-    bottom: 58px !important;
+    bottom: 18px !important;
     left: auto !important;
-    right: 80px !important;
+    right: 56px !important;
     z-index: 1102 !important;
     width: 88px !important;
     opacity: 0 !important;     /* invisible but clickable */
-    height: 32px !important;
+    height: 28px !important;
 }
 [data-testid="stSelectbox"] > div {
-    height: 32px !important;
+    height: 28px !important;
 }
 
 /* Visible inline controls inside the chat input */
 .chat-inline-control {
     position: fixed;
-    bottom: 57px;
+    bottom: 18px;
     z-index: 1101;
-    height: 32px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -541,13 +535,13 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
     pointer-events: none;
 }
 .chat-inline-folder {
-    right: 184px;
-    width: 32px;
-    font-size: 16px;
+    right: 158px;
+    width: 30px;
+    font-size: 14px;
 }
 .chat-inline-model {
-    right: 80px;
-    width: 88px;
+    right: 56px;
+    width: 92px;
     gap: 5px;
 }
 .chat-inline-model strong {
@@ -633,17 +627,6 @@ st.markdown(f"""
 <div class="tda-sidebar">
 </div>
 
-<!-- BOTTOM TOOLBAR -->
-<div class="snti-toolbar" id="snti-toolbar">
-  <div class="t-plus" title="Upload file">+</div>
-  <div class="t-sep"></div>
-  <div class="t-model" title="Switch model" id="t-model-label">
-    <span id="t-model-name">Llama</span>
-    <span class="t-chevron">&#9650;</span>
-  </div>
-  <div class="t-spacer"></div>
-  <div class="t-plan">Plan &nbsp;&#8594;</div>
-</div>
 """, unsafe_allow_html=True)
 
 # ---------- SESSION ----------
@@ -660,7 +643,7 @@ model_choice = st.selectbox("Model", ["Auto", "Llama", "Gemini"], index=1, label
                              key="model_select")
 st.markdown(
     f"""
-    <div class="chat-inline-control chat-inline-folder" title="Upload files">F</div>
+    <div class="chat-inline-control chat-inline-folder" title="Upload files">&#128193;</div>
     <div class="chat-inline-control chat-inline-model" title="Switch model">
       <strong>{model_choice}</strong><span>▾</span>
     </div>
