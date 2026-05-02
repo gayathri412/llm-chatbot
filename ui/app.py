@@ -1,54 +1,26 @@
-import sys, os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from data.context import fetch_context
-import io, math, requests, base64
+import sys
+import os
+import io
+import math
+import requests
+import base64
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import streamlit as st
 from PIL import Image, ImageEnhance, ImageDraw
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
-import streamlit as st
 from auth import require_login
-
-import streamlit as st
+from analysis import render_charts_page
+from data.context import fetch_context
 from app.access_control import build_access_policy
 from app.config import get_settings
 from app.orchestrator import answer_query as orchestrator_answer_query
 from app.appwrite_storage import AppwriteStorageError
 from app.firebase_storage import FirebaseStorageError
 from app.upload_storage import UploadStorageError, storage_backend, upload_streamlit_file
-
-
-
-# client setup here
-# model_choice setup here
-
-model_choice = st.sidebar.selectbox(
-    "Choose Model",
-    ["gpt-4o-mini", "gpt-4o"],
-    key="model_selector"
-)
-
-def answer_query(prompt, model_choice):
-    response = client.chat.completions.create(
-        model=model_choice,
-        messages=[
-            {"role": "user", "content": prompt}
-        ],
-    )
-    return response.choices[0].message.content
-
-
-page = st.sidebar.selectbox(
-    "Choose Page",
-    ["Home", "Charts"],
-    key="main_page_selector"
-)
-
-if page == "Home":
-    render_charts_page(model_choice, answer_query)
-
-elif page == "Charts":
-    render_charts_page(model_choice, answer_query)
 
 
 st.set_page_config(page_title="SNTI AI Assistant", page_icon="🤖", layout="wide")
@@ -62,6 +34,25 @@ def answer_query(query, model_choice="Llama", **kwargs):
     kwargs.setdefault("user_id", auth_user_id)
     kwargs.setdefault("user_context", current_user)
     return orchestrator_answer_query(query, model_choice, **kwargs)
+
+
+model_choice = st.sidebar.selectbox(
+    "Choose Model",
+    ["Llama", "gpt-4o-mini", "gpt-4o"],
+    key="model_selector",
+)
+
+page = st.sidebar.selectbox(
+    "Choose Page",
+    ["Home", "Charts"],
+    key="main_page_selector",
+)
+
+if page == "Home":
+    st.title("Home Page")
+
+elif page == "Charts":
+    render_charts_page(model_choice, answer_query)
 
 
 def save_upload_to_firebase(uploaded_file, area: str) -> dict | None:
@@ -97,7 +88,7 @@ def save_upload_to_firebase(uploaded_file, area: str) -> dict | None:
     st.caption(f"Saved to {stored.get('backend', backend).title()} Storage: `{stored['uri']}`")
     return stored
 
-from analysis import render_charts_page
+
 
 # ---------- GLOBAL ----------
 if "history" not in st.session_state:
