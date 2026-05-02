@@ -665,8 +665,12 @@ def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
 
     with sign_in_tab:
         _render_sign_in_form()
+
         st.divider()
+        st.write("Or continue with")
+
         col1, col2 = st.columns(2)
+
         with col1:
             if st.button("Continue with Google", use_container_width=True, key="google_sign_in"):
                 st.info("Google sign-in needs OAuth setup.")
@@ -680,19 +684,21 @@ def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
         _render_create_account_form()
 
         st.divider()
+        st.divider()
+        st.write("Or create with")
+
         col1, col2 = st.columns(2)
+
         with col1:
              if st.button("Continue with Google", use_container_width=True, key="google_create"):
-                 st.info("Google sign-in needs OAuth setup.")
+                st.info("Google sign-in needs OAuth setup.")
 
-        with reset_tab:
-             _render_reset_password_form()
-            
-
-
+        with col2:       
+             if st.button("Continue with GitHub", use_container_width=True, key="github_create"):
+                st.info("GitHub sign-in needs OAuth setup.")
 
     with reset_tab:
-        _render_reset_password_form()
+             _render_reset_password_form()
 
     st.stop()
 
