@@ -99,12 +99,12 @@ button[kind="header"],
 /* ── FILE UPLOADER — overlaid on the + button in bottom toolbar ── */
 [data-testid="stFileUploader"] {
     position: fixed !important;
-    bottom: 18px !important;
-    left: min(920px, calc(100vw - 198px)) !important;
+    bottom: 19px !important;
+    left: min(928px, calc(100vw - 190px)) !important;
     right: auto !important;
     z-index: 1103 !important;
-    width: 30px !important;
-    height: 30px !important;
+    width: 28px !important;
+    height: 26px !important;
 }
 /* Keep the section visible but transparent so it stays clickable */
 [data-testid="stFileUploader"] section {
@@ -112,8 +112,8 @@ button[kind="header"],
     background: transparent !important;
     padding: 0 !important;
     min-height: unset !important;
-    width: 30px !important;
-    height: 30px !important;
+    width: 28px !important;
+    height: 26px !important;
 }
 [data-testid="stFileUploaderDropzoneInstructions"],
 [data-testid="stFileUploader"] span,
@@ -126,9 +126,9 @@ button[kind="header"],
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-    min-height: 30px !important;
-    width: 30px !important;
-    height: 30px !important;
+    min-height: 26px !important;
+    width: 28px !important;
+    height: 26px !important;
     cursor: pointer !important;
     opacity: 0 !important;   /* invisible but fully clickable */
 }
@@ -137,8 +137,8 @@ button[kind="header"],
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 30px !important;
-    height: 30px !important;
+    width: 28px !important;
+    height: 26px !important;
     border-radius: 8px !important;
     background: transparent !important;
     border: none !important;
@@ -393,7 +393,7 @@ button[kind="header"],
     max-height: 58px !important;
     padding-top: 2px !important;
     padding-bottom: 2px !important;
-    padding-right: 134px !important;
+    padding-right: 158px !important;
     font-size: 14px !important;
 }
 [data-testid="stChatInput"] textarea::placeholder {
@@ -507,29 +507,28 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 /* Model selectbox — overlaid on .t-model area, transparent */
 [data-testid="stSelectbox"] {
     position: fixed !important;
-    bottom: 18px !important;
-    left: min(956px, calc(100vw - 162px)) !important;
-    right: 56px !important;
+    bottom: 19px !important;
+    left: min(966px, calc(100vw - 152px)) !important;
     right: auto !important;
     z-index: 1102 !important;
-    width: 92px !important;
+    width: 78px !important;
     opacity: 0 !important;     /* invisible but clickable */
-    height: 28px !important;
+    height: 26px !important;
 }
 [data-testid="stSelectbox"] > div {
-    height: 28px !important;
+    height: 26px !important;
 }
 
 /* Visible inline controls inside the chat input */
 .chat-inline-control {
     position: fixed;
-    bottom: 18px;
+    bottom: 19px;
     z-index: 1101;
-    height: 28px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: 7px;
     border: 1px solid var(--border);
     background: var(--bg-hover);
     color: var(--text-muted);
@@ -537,18 +536,18 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
     pointer-events: none;
 }
 .chat-inline-folder {
-    left: min(920px, calc(100vw - 198px));
-    width: 30px;
-    font-size: 14px;
+    left: min(928px, calc(100vw - 190px));
+    width: 28px;
+    font-size: 13px;
 }
 .chat-inline-model {
-    left: min(956px, calc(100vw - 162px));
-    width: 92px;
-    gap: 5px;
+    left: min(966px, calc(100vw - 152px));
+    width: 78px;
+    gap: 4px;
 }
 .chat-inline-model strong {
     color: var(--text-primary);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
 }
 </style>
