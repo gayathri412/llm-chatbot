@@ -29,9 +29,16 @@ def _build_pdf_report(title, report_text):
 
 
 def render_charts_page(model_choice, answer_query):
-    st.title("AI Data Analytics + Prediction")
+    st.title("📊 AI Data Analytics + Prediction")
+    file = st.file_uploader(
+        "📂 Upload CSV or PDF",
+        type=["csv", "pdf"]
+    )
 
-    file = st.file_uploader("Upload CSV or PDF", type=["csv", "pdf"])
+    question = st.text_input(
+         "Ask something about your data or document",
+         placeholder="Type your question here..."
+    )
 
     if not file:
         return
