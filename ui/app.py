@@ -22,6 +22,12 @@ from analysis import render_charts_page
 # client setup here
 # model_choice setup here
 
+model_choice = st.sidebar.selectbox(
+    "Choose Model",
+    ["gpt-4o-mini", "gpt-4o"],
+    key="model_selector"
+)
+
 def answer_query(prompt, model_choice):
     response = client.chat.completions.create(
         model=model_choice,
