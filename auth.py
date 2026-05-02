@@ -678,6 +678,19 @@ def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
         
     with create_tab:
         _render_create_account_form()
+
+        st.divider()
+        col1, col2 = st.columns(2)
+        with col1:
+             if st.button("Continue with Google", use_container_width=True, key="google_create"):
+                 st.info("Google sign-in needs OAuth setup.")
+
+        with reset_tab:
+             _render_reset_password_form()
+            
+
+
+
     with reset_tab:
         _render_reset_password_form()
 
