@@ -99,7 +99,7 @@ button[kind="header"],
 /* ── FILE UPLOADER — overlaid on the + button in bottom toolbar ── */
 [data-testid="stFileUploader"] {
     position: fixed !important;
-    bottom: 19px !important;
+    bottom: 12px !important;
     left: min(928px, calc(100vw - 190px)) !important;
     right: auto !important;
     z-index: 1103 !important;
@@ -507,7 +507,7 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 /* Model selectbox — overlaid on .t-model area, transparent */
 [data-testid="stSelectbox"] {
     position: fixed !important;
-    bottom: 19px !important;
+    bottom: 12px !important;
     left: min(966px, calc(100vw - 152px)) !important;
     right: auto !important;
     z-index: 1102 !important;
@@ -522,15 +522,16 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 /* Visible inline controls inside the chat input */
 .chat-inline-control {
     position: fixed;
-    bottom: 19px;
+    bottom: 12px;
     z-index: 1101;
     height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 7px;
-    border: 1px solid var(--border);
-    background: var(--bg-hover);
+    border: none;
+    background: var(--bg-card);
+    box-shadow: 0 0 0 2px var(--bg-card);
     color: var(--text-muted);
     font-size: 13px;
     pointer-events: none;
