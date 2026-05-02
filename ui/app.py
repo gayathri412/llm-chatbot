@@ -16,13 +16,39 @@ from app.orchestrator import answer_query as orchestrator_answer_query
 from app.appwrite_storage import AppwriteStorageError
 from app.firebase_storage import FirebaseStorageError
 from app.upload_storage import UploadStorageError, storage_backend, upload_streamlit_file
-from analysis import render_charts_page
 
 
 model_choice = st.sidebar.selectbox(
     "Choose Model",
     ["gpt-4o-mini", "gpt-4o"]
 )
+
+import streamlit as st
+from analysis import render_charts_page
+
+# client setup here
+# model_choice setup here
+
+def answer_query(prompt, model_choice):
+    response = client.chat.completions.create(
+        model=model_choice,
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
+    )
+    return response.choices[0].message.content
+
+page = st.sidebar.selectbox(
+    "Choose Page",
+    ["Home", "Charts"]
+)
+
+if page == "Home":
+    render_charts_page(model_choice, answer_query)
+
+elif page == "Charts":
+    render_charts_page(model_choice, answer_query)
+
 
 # add this here
 page = st.sidebar.selectbox(
