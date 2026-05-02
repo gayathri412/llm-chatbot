@@ -17,13 +17,6 @@ from app.appwrite_storage import AppwriteStorageError
 from app.firebase_storage import FirebaseStorageError
 from app.upload_storage import UploadStorageError, storage_backend, upload_streamlit_file
 
-
-model_choice = st.sidebar.selectbox(
-    "Choose Model",
-    ["gpt-4o-mini", "gpt-4o"]
-)
-
-import streamlit as st
 from analysis import render_charts_page
 
 # client setup here
@@ -38,9 +31,11 @@ def answer_query(prompt, model_choice):
     )
     return response.choices[0].message.content
 
+
 page = st.sidebar.selectbox(
     "Choose Page",
-    ["Home", "Charts"]
+    ["Home", "Charts"],
+    key="main_page_selector"
 )
 
 if page == "Home":
@@ -49,19 +44,6 @@ if page == "Home":
 elif page == "Charts":
     render_charts_page(model_choice, answer_query)
 
-
-# add this here
-page = st.sidebar.selectbox(
-    "Choose Page",
-    ["Home", "Charts"]
-)
-
-if page == "Home":
-    render_charts_page(model_choice, answer_query)
-
-
-elif page == "Charts":
-    render_charts_page(model_choice, answer_query)
 
 st.set_page_config(page_title="SNTI AI Assistant", page_icon="🤖", layout="wide")
 
