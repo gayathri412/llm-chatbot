@@ -49,10 +49,21 @@ page = st.sidebar.selectbox(
 )
 
 if page == "Home":
-    render_charts_page(model_choice, answer_query)
+    st.markdown(
+        """
+        <div style="padding: 32px 0;">
+            <h1>Home Page</h1>
+            <h2>SNTI Digital Assistant</h2>
+            <p>Hello! Welcome to <b>SNTI AI</b> — your intelligent digital assistant.</p>
+            <p>Use the sidebar to open <b>Charts</b> for CSV/PDF analytics.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 elif page == "Charts":
     render_charts_page(model_choice, answer_query)
+
 
 
 def save_upload_to_firebase(uploaded_file, area: str) -> dict | None:
