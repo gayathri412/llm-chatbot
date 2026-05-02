@@ -636,7 +636,7 @@ def _render_auth_styles() -> None:
         /* Left panel - dark */
         .auth-left {
             flex: 1;
-            background: #f8f6f3;
+            background: #faf8f5;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -718,7 +718,7 @@ def _render_auth_styles() -> None:
         .auth-features {
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: 20px;
         }
         
         .auth-feature {
@@ -761,13 +761,41 @@ def _render_auth_styles() -> None:
             flex-direction: column;
             justify-content: center;
             padding: 60px 80px;
-            max-width: 560px;
+            max-width: 520px;
             min-height: 100vh;
+            box-shadow: -4px 0 24px rgba(0,0,0,0.03);
         }
         
-        /* Ensure Streamlit tabs work properly */
-        .auth-right .stTabs {
+        /* Ensure Streamlit content shows in right panel */
+        .auth-right > div {
             width: 100%;
+        }
+        
+        /* Make sure Streamlit forms and tabs appear in the flow */
+        .auth-right .stForm,
+        .auth-right .stTabs,
+        .auth-right [data-testid="stForm"],
+        .auth-right [data-testid="stTabs"] {
+            width: 100% !important;
+        }
+        
+        .auth-right [data-baseweb="tab-list"] {
+            gap: 32px !important;
+            border-bottom: 1px solid #e5e5e5 !important;
+        }
+        
+        .auth-right [data-baseweb="tab"] {
+            padding: 12px 0 !important;
+            font-size: 14px !important;
+            font-weight: 500 !important;
+            color: #666 !important;
+            background: transparent !important;
+            border-bottom: 2px solid transparent !important;
+        }
+        
+        .auth-right [aria-selected="true"] {
+            color: #9D174D !important;
+            border-bottom-color: #9D174D !important;
         }
         
         .auth-tabs {
@@ -984,7 +1012,7 @@ def _render_auth_panel(title: str, message: str) -> None:
                 </div>
                 <div class="auth-welcome">
                     <div class="auth-welcome-label">Welcome Back</div>
-                    <h1>Sign in to SNTI AI Assistant</h1>
+                    <h1>Sign in to <span style="color: #9D174D;">SNTI AI</span> Assistant</h1>
                     <p>Access your workspace to continue research, analyze data, write code, and more with your AI assistant.</p>
                     <div class="auth-features">
                         <div class="auth-feature">
