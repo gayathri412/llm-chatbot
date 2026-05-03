@@ -20,3 +20,5 @@ Thumbs.db
 
 # VS Code settings (optional)
 .vscode/
+
+streamlit/session_cache.json

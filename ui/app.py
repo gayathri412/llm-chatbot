@@ -13,7 +13,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
 from auth import require_login
-from analysis import render_charts_page
+from ui.analysis import render_charts_page
 from data.context import fetch_context
 from app.access_control import build_access_policy
 from app.config import get_settings
