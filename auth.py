@@ -1,6 +1,31 @@
-import html
+# app.py — SNTI AI Assistant
+# Firebase auth + Google/GitHub/Microsoft OAuth + auto-refresh + inactivity timeout
+# New in this version:
+#   • JS heartbeat  — mouse/keyboard/touch/scroll events ping Python via
+#                     st.query_params; pauses when tab is hidden (visibilitychange)
+#   • Warning banner + modal countdown — shown IDLE_WARN_SEC before auto-logout
+#   • touch_activity() wired into every login form, OAuth callbacks, and UI action
+#
+# Execution sequence:
+#   1.  Imports & config
+#   2.  Session persistence helpers
+#   3.  Token refresh helpers
+#   4.  Firebase email/password auth
+#   5.  OAuth providers
+#   6.  Inactivity tracking  (touch_activity / check_inactivity / _idle_remaining)
+#   7.  JS heartbeat injector  (inject_heartbeat_js)
+#   8.  Idle warning banner  (render_idle_warning)
+#   9.  Login UI  (render_login)
+#   10. Auth gate  (require_login)
+#   11. Logout confirmation dialog
+#   12. Main app
+# ─────────────────────────────────────────────────────────────────────────────
+
+import json
 import os
-import secrets
+import secrets as pysecrets
+import time
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
@@ -10,1032 +35,814 @@ import streamlit as st
 try:
     from dotenv import load_dotenv
 except ImportError:
-    def load_dotenv(*args, **kwargs):
-        return False
-
-
+    def load_dotenv(*a, **k): return False
 load_dotenv()
 
-FIREBASE_AUTH_BASE_URL = "https://identitytoolkit.googleapis.com/v1"
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. Config
+# ─────────────────────────────────────────────────────────────────────────────
+FIREBASE_API_KEY       = os.getenv("FIREBASE_API_KEY", "")
+APP_REDIRECT_URI       = os.getenv("APP_REDIRECT_URI", "http://localhost:8501")
 
+GOOGLE_CLIENT_ID       = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET   = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
-class FirebaseAuthError(Exception):
-    pass
+GITHUB_CLIENT_ID       = os.getenv("GITHUB_CLIENT_ID", "")
+GITHUB_CLIENT_SECRET   = os.getenv("GITHUB_CLIENT_SECRET", "")
 
+MS_CLIENT_ID           = os.getenv("MS_CLIENT_ID", "")
+MS_CLIENT_SECRET       = os.getenv("MS_CLIENT_SECRET", "")
+MS_TENANT              = os.getenv("MS_TENANT", "common")
 
-class FirebaseConfigError(Exception):
-    pass
+SESSION_FILE           = Path(os.getenv("SESSION_FILE", ".snti_session.json"))
+REFRESH_LEEWAY_SEC     = 300
+INACTIVITY_TIMEOUT_MIN = int(os.getenv("INACTIVITY_TIMEOUT_MIN", "15"))
+INACTIVITY_TIMEOUT_SEC = INACTIVITY_TIMEOUT_MIN * 60
+# JS warns this many seconds before the hard Python timeout
+IDLE_WARN_SEC          = int(os.getenv("IDLE_WARN_SEC", "120"))   # default: 2 min before
+# How often the browser sends a "still alive" ping to Python
+HEARTBEAT_INTERVAL_SEC = int(os.getenv("HEARTBEAT_INTERVAL_SEC", "30"))
 
+FIREBASE_SIGNIN_URL    = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
+FIREBASE_SIGNUP_URL    = f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={FIREBASE_API_KEY}"
+FIREBASE_RESET_URL     = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={FIREBASE_API_KEY}"
+FIREBASE_IDP_URL       = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key={FIREBASE_API_KEY}"
+FIREBASE_REFRESH_URL   = f"https://securetoken.googleapis.com/v1/token?key={FIREBASE_API_KEY}"
 
-class SocialAuthError(Exception):
-    pass
-
-
-class SocialConfigError(Exception):
-    pass
-
-
-class OIDCAuthError(Exception):
-    pass
-
-
-class OIDCConfigError(Exception):
-    pass
-
-
-def _get_secret_value(section: str, key: str) -> str | None:
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. Session persistence
+# ─────────────────────────────────────────────────────────────────────────────
+def _load_persisted() -> dict[str, Any] | None:
+    if not SESSION_FILE.exists():
+        return None
     try:
-        values = st.secrets.get(section, {})
-        if hasattr(values, "get"):
-            return values.get(key) or None
+        return json.loads(SESSION_FILE.read_text())
+    except Exception:
+        return None
+
+def _save_persisted(data: dict[str, Any]) -> None:
+    try:
+        SESSION_FILE.write_text(json.dumps(data))
     except Exception:
         pass
-    return None
 
-
-def _auth_provider() -> str:
-    return (os.getenv("AUTH_PROVIDER") or _get_secret_value("auth", "provider") or "firebase").lower()
-
-
-def _firebase_api_key() -> str | None:
-    return (
-        os.getenv("FIREBASE_WEB_API_KEY")
-        or _get_secret_value("firebase", "web_api_key")
-    )
-
-
-def _firebase_project_id() -> str | None:
-    return (
-        os.getenv("FIREBASE_PROJECT_ID")
-        or os.getenv("GCP_PROJECT_ID")
-        or _get_secret_value("firebase", "project_id")
-    )
-
-
-def _oidc_secret(key: str) -> str | None:
-    env_name = f"OIDC_{key.upper()}"
-    return os.getenv(env_name) or _get_secret_value("oidc", key)
-
-
-def _oidc_provider_name() -> str:
-    return _oidc_secret("provider_name") or "Enterprise SSO"
-
-
-def _oidc_discovery_url() -> str | None:
-    return _oidc_secret("discovery_url")
-
-
-def _oidc_client_id() -> str | None:
-    return _oidc_secret("client_id")
-
-
-def _oidc_client_secret() -> str | None:
-    return _oidc_secret("client_secret")
-
-
-def _oidc_redirect_uri() -> str | None:
-    redirect_uri = _oidc_secret("redirect_uri")
-    if redirect_uri:
-        return redirect_uri
-    app_base_url = os.getenv("APP_BASE_URL") or _get_secret_value("app", "base_url")
-    return app_base_url.rstrip("/") if app_base_url else None
-
-
-def _oidc_scopes() -> str:
-    return _oidc_secret("scopes") or "openid profile email"
-
-
-def _oidc_list_secret(key: str) -> list[str]:
-    raw = _oidc_secret(key) or ""
-    return [item.strip().lower() for item in raw.split(",") if item.strip()]
-
-
-def _oidc_ready() -> bool:
-    return all([
-        _oidc_discovery_url(),
-        _oidc_client_id(),
-        _oidc_client_secret(),
-        _oidc_redirect_uri(),
-    ])
-
-
-def _oidc_discovery() -> dict[str, Any]:
-    discovery_url = _oidc_discovery_url()
-    if not discovery_url:
-        raise OIDCConfigError("OIDC_DISCOVERY_URL is not configured.")
-    response = requests.get(discovery_url, timeout=20)
-    if not response.ok:
-        raise OIDCConfigError(f"Could not load OIDC discovery document: {response.status_code}")
-    return response.json()
-
-
-def _friendly_firebase_error(code: str) -> str:
-    messages = {
-        "EMAIL_EXISTS": "An account already exists for this email.",
-        "EMAIL_NOT_FOUND": "No account was found for this email.",
-        "INVALID_LOGIN_CREDENTIALS": "The email or password is incorrect.",
-        "INVALID_PASSWORD": "The email or password is incorrect.",
-        "MISSING_PASSWORD": "Please enter a password.",
-        "USER_DISABLED": "This account has been disabled.",
-        "WEAK_PASSWORD : Password should be at least 6 characters": "Use a stronger password with at least 8 characters.",
-        "TOO_MANY_ATTEMPTS_TRY_LATER": "Too many attempts. Please wait a moment and try again.",
-        "INVALID_EMAIL": "Please enter a valid email address.",
-        "OPERATION_NOT_ALLOWED": "Email/password sign-in is not enabled in Firebase. Open Firebase Authentication > Sign-in method and enable Email/Password.",
-        "PASSWORD_LOGIN_DISABLED": "Email/password sign-in is not enabled in Firebase. Open Firebase Authentication > Sign-in method and enable Email/Password.",
-        "CONFIGURATION_NOT_FOUND": "Firebase Authentication is not initialized for this project. Open Firebase Authentication, click Get started, and enable Email/Password.",
-        "API_KEY_INVALID": "The Firebase Web API key is invalid. Copy the apiKey from your Web app config again.",
-        "INVALID_API_KEY": "The Firebase Web API key is invalid. Copy the apiKey from your Web app config again.",
-        "PROJECT_NOT_FOUND": "Firebase could not find this project. Check FIREBASE_PROJECT_ID in .env.",
-        "ADMIN_ONLY_OPERATION": "Account creation is disabled for this Firebase project.",
-    }
-    return messages.get(code, f"Firebase error: {code or 'unknown error'}")
-
-
-def _firebase_request(endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
-    api_key = _firebase_api_key()
-    if not api_key:
-        raise FirebaseConfigError("FIREBASE_WEB_API_KEY is not configured.")
-    url = f"{FIREBASE_AUTH_BASE_URL}/{endpoint}?key={api_key}"
-    response = requests.post(url, json=payload, timeout=20)
+def _clear_persisted() -> None:
     try:
-        data = response.json()
-    except ValueError:
-        data = {}
-    if response.ok:
-        return data
-    error_code = data.get("error", {}).get("message", "")
-    raise FirebaseAuthError(_friendly_firebase_error(error_code))
+        SESSION_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
 
-
-def _user_from_firebase(data: dict[str, Any]) -> dict[str, str]:
-    email = data.get("email", "")
-    display_name = data.get("displayName") or email.split("@")[0] or "User"
-    uid = data.get("localId", "")
-    return {
-        "provider": "firebase",
-        "user_id": uid or email,
-        "username": email,
-        "email": email,
-        "name": display_name,
-        "id_token": data.get("idToken", ""),
-        "refresh_token": data.get("refreshToken", ""),
+def save_session(payload: dict[str, Any]) -> None:
+    expires_in = int(payload.get("expiresIn", 3600))
+    record = {
+        "idToken":      payload["idToken"],
+        "refreshToken": payload["refreshToken"],
+        "localId":      payload.get("localId") or payload.get("user_id"),
+        "email":        payload.get("email", ""),
+        "displayName":  payload.get("displayName", ""),
+        "photoUrl":     payload.get("photoUrl", ""),
+        "provider":     payload.get("providerId", "password"),
+        "expiresAt":    int(time.time()) + expires_in,
     }
+    st.session_state["auth"] = record
+    _save_persisted(record)
+    touch_activity()   # every successful auth resets the idle clock
 
+def clear_session() -> None:
+    st.session_state.pop("auth", None)
+    st.session_state.pop("last_activity", None)
+    st.session_state.pop("_idle_warning_shown", None)
+    _clear_persisted()
 
-def _sign_in(email: str, password: str) -> dict[str, str]:
-    data = _firebase_request(
-        "accounts:signInWithPassword",
-        {"email": email, "password": password, "returnSecureToken": True},
+def hydrate_from_disk() -> None:
+    if "auth" in st.session_state:
+        return
+    persisted = _load_persisted()
+    if persisted:
+        st.session_state["auth"] = persisted
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. Token refresh
+# ─────────────────────────────────────────────────────────────────────────────
+def _refresh(refresh_token: str) -> dict[str, Any]:
+    r = requests.post(
+        FIREBASE_REFRESH_URL,
+        data={"grant_type": "refresh_token", "refresh_token": refresh_token},
+        timeout=10,
     )
-    return _user_from_firebase(data)
+    r.raise_for_status()
+    return r.json()
 
+def ensure_fresh_token() -> bool:
+    auth = st.session_state.get("auth")
+    if not auth:
+        return False
+    if int(time.time()) < auth["expiresAt"] - REFRESH_LEEWAY_SEC:
+        return True
+    try:
+        data = _refresh(auth["refreshToken"])
+        auth["idToken"]      = data["id_token"]
+        auth["refreshToken"] = data["refresh_token"]
+        auth["expiresAt"]    = int(time.time()) + int(data["expires_in"])
+        st.session_state["auth"] = auth
+        _save_persisted(auth)
+        return True
+    except Exception:
+        clear_session()
+        return False
 
-def _create_account(email: str, password: str, display_name: str) -> dict[str, str]:
-    data = _firebase_request(
-        "accounts:signUp",
-        {"email": email, "password": password, "returnSecureToken": True},
+def authed_headers() -> dict[str, str]:
+    if not ensure_fresh_token():
+        return {}
+    return {"Authorization": f"Bearer {st.session_state['auth']['idToken']}"}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. Firebase email/password auth
+# ─────────────────────────────────────────────────────────────────────────────
+def _firebase_err(r: requests.Response) -> str:
+    try:
+        return r.json().get("error", {}).get("message", "Unknown error")
+    except Exception:
+        return "Unknown error"
+
+def email_signin(email: str, password: str) -> tuple[bool, str]:
+    r = requests.post(
+        FIREBASE_SIGNIN_URL,
+        json={"email": email, "password": password, "returnSecureToken": True},
+        timeout=10,
     )
-    if display_name:
-        data = _firebase_request(
-            "accounts:update",
-            {"idToken": data["idToken"], "displayName": display_name, "returnSecureToken": True},
-        )
-    return _user_from_firebase(data)
+    if r.status_code != 200:
+        return False, _firebase_err(r)
+    save_session(r.json())   # save_session → touch_activity internally
+    return True, "Signed in"
 
-
-def _send_password_reset(email: str) -> None:
-    _firebase_request(
-        "accounts:sendOobCode",
-        {"requestType": "PASSWORD_RESET", "email": email},
+def email_signup(email: str, password: str) -> tuple[bool, str]:
+    r = requests.post(
+        FIREBASE_SIGNUP_URL,
+        json={"email": email, "password": password, "returnSecureToken": True},
+        timeout=10,
     )
+    if r.status_code != 200:
+        return False, _firebase_err(r)
+    save_session(r.json())
+    return True, "Account created"
 
+def password_reset(email: str) -> tuple[bool, str]:
+    r = requests.post(
+        FIREBASE_RESET_URL,
+        json={"requestType": "PASSWORD_RESET", "email": email},
+        timeout=10,
+    )
+    if r.status_code != 200:
+        return False, _firebase_err(r)
+    touch_activity()   # form submit counts as user interaction
+    return True, "Password reset email sent"
 
-def _oidc_authorization_url() -> str:
-    discovery = _oidc_discovery()
-    authorization_endpoint = discovery.get("authorization_endpoint")
-    if not authorization_endpoint:
-        raise OIDCConfigError("OIDC discovery document is missing authorization_endpoint.")
-    state = secrets.token_urlsafe(24)
-    nonce = secrets.token_urlsafe(24)
-    st.session_state.oidc_state = state
-    st.session_state.oidc_nonce = nonce
-    prompt = _oidc_secret("prompt")
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. OAuth providers
+# ─────────────────────────────────────────────────────────────────────────────
+PROVIDERS = {
+    "google": {
+        "label": "Continue with Google",
+        "auth":  "https://accounts.google.com/o/oauth2/v2/auth",
+        "token": "https://oauth2.googleapis.com/token",
+        "scope": "openid email profile",
+        "client_id":     GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "fb_provider":   "google.com",
+    },
+    "github": {
+        "label": "Continue with GitHub",
+        "auth":  "https://github.com/login/oauth/authorize",
+        "token": "https://github.com/login/oauth/access_token",
+        "scope": "read:user user:email",
+        "client_id":     GITHUB_CLIENT_ID,
+        "client_secret": GITHUB_CLIENT_SECRET,
+        "fb_provider":   "github.com",
+    },
+    "microsoft": {
+        "label": "Continue with Microsoft",
+        "auth":  f"https://login.microsoftonline.com/{MS_TENANT}/oauth2/v2.0/authorize",
+        "token": f"https://login.microsoftonline.com/{MS_TENANT}/oauth2/v2.0/token",
+        "scope": "openid email profile",
+        "client_id":     MS_CLIENT_ID,
+        "client_secret": MS_CLIENT_SECRET,
+        "fb_provider":   "microsoft.com",
+    },
+}
+
+def oauth_url(provider: str) -> str:
+    cfg = PROVIDERS[provider]
+    state = pysecrets.token_urlsafe(24)
+    st.session_state[f"oauth_state_{provider}"] = state
     params = {
-        "client_id": _oidc_client_id(),
+        "client_id":     cfg["client_id"],
+        "redirect_uri":  APP_REDIRECT_URI,
         "response_type": "code",
-        "scope": _oidc_scopes(),
-        "redirect_uri": _oidc_redirect_uri(),
-        "state": state,
-        "nonce": nonce,
+        "scope":         cfg["scope"],
+        "state":         f"{provider}:{state}",
     }
-    if prompt:
-        params["prompt"] = prompt
-    return f"{authorization_endpoint}?{urlencode(params)}"
+    touch_activity()   # user clicked an OAuth button
+    return f"{cfg['auth']}?{urlencode(params)}"
 
-
-def _exchange_oidc_code(code: str, state: str) -> dict[str, Any]:
-    expected_state = st.session_state.get("oidc_state")
-    if not expected_state or state != expected_state:
-        raise OIDCAuthError("SSO state check failed. Please try signing in again.")
-    discovery = _oidc_discovery()
-    token_endpoint = discovery.get("token_endpoint")
-    userinfo_endpoint = discovery.get("userinfo_endpoint")
-    if not token_endpoint:
-        raise OIDCConfigError("OIDC discovery document is missing token_endpoint.")
-    if not userinfo_endpoint:
-        raise OIDCConfigError("OIDC discovery document is missing userinfo_endpoint.")
-    token_response = requests.post(
-        token_endpoint,
+def exchange_code(provider: str, code: str) -> str:
+    cfg = PROVIDERS[provider]
+    r = requests.post(
+        cfg["token"],
         data={
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": _oidc_redirect_uri(),
-            "client_id": _oidc_client_id(),
-            "client_secret": _oidc_client_secret(),
+            "client_id":     cfg["client_id"],
+            "client_secret": cfg["client_secret"],
+            "code":          code,
+            "redirect_uri":  APP_REDIRECT_URI,
+            "grant_type":    "authorization_code",
         },
         headers={"Accept": "application/json"},
-        timeout=20,
+        timeout=10,
     )
-    try:
-        token_data = token_response.json()
-    except ValueError:
-        token_data = {}
-    if not token_response.ok:
-        error = token_data.get("error_description") or token_data.get("error") or token_response.text
-        raise OIDCAuthError(f"SSO token exchange failed: {error}")
-    access_token = token_data.get("access_token")
-    if not access_token:
-        raise OIDCAuthError("SSO provider did not return an access token.")
-    userinfo_response = requests.get(
-        userinfo_endpoint,
-        headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
-        timeout=20,
-    )
-    try:
-        userinfo = userinfo_response.json()
-    except ValueError:
-        userinfo = {}
-    if not userinfo_response.ok:
-        error = userinfo.get("error_description") or userinfo.get("error") or userinfo_response.text
-        raise OIDCAuthError(f"SSO user profile lookup failed: {error}")
-    userinfo["_tokens"] = token_data
-    return userinfo
+    r.raise_for_status()
+    body = r.json()
+    return body.get("id_token") or body.get("access_token", "")
 
-
-def _user_from_oidc(data: dict[str, Any]) -> dict[str, Any]:
-    tokens = data.get("_tokens", {})
-    email = (
-        data.get("email")
-        or data.get("preferred_username")
-        or data.get("upn")
-        or data.get("unique_name")
-        or ""
-    )
-    subject = data.get("sub") or data.get("oid") or email
-    display_name = data.get("name") or data.get("given_name") or email.split("@")[0] or "User"
-    groups = data.get("groups") if isinstance(data.get("groups"), list) else []
-    roles = data.get("roles") if isinstance(data.get("roles"), list) else []
-    return {
-        "provider": "oidc",
-        "user_id": str(subject),
-        "username": str(email or subject),
-        "email": str(email),
-        "name": str(display_name),
-        "groups": groups,
-        "roles": roles,
-        "id_token": tokens.get("id_token", ""),
-        "access_token": tokens.get("access_token", ""),
-        "refresh_token": tokens.get("refresh_token", ""),
-    }
-
-
-def _validate_oidc_access(user: dict[str, Any]) -> None:
-    allowed_emails = _oidc_list_secret("allowed_emails")
-    allowed_domains = _oidc_list_secret("allowed_domains")
-    if not allowed_emails and not allowed_domains:
-        return
-    email = str(user.get("email") or "").lower()
-    domain = email.rsplit("@", 1)[-1] if "@" in email else ""
-    if email in allowed_emails or domain in allowed_domains:
-        return
-    raise OIDCAuthError("Your SSO account is not allowed to access this app.")
-
-
-def _clear_auth_session() -> None:
-    for key in (
-        "authenticated", "auth_provider", "auth_user", "auth_user_id",
-        "auth_email", "auth_name", "auth_groups", "auth_roles",
-        "firebase_id_token", "firebase_refresh_token",
-        "oidc_id_token", "oidc_access_token", "oidc_refresh_token",
-        "oidc_state", "oidc_nonce",
-    ):
-        st.session_state.pop(key, None)
-
-
-def _set_auth_session(user: dict[str, Any]) -> None:
-    st.session_state.authenticated = True
-    st.session_state.auth_provider = user.get("provider", _auth_provider())
-    st.session_state.auth_user = user["username"]
-    st.session_state.auth_user_id = user["user_id"]
-    st.session_state.auth_email = user["email"]
-    st.session_state.auth_name = user["name"]
-    st.session_state.auth_groups = user.get("groups", [])
-    st.session_state.auth_roles = user.get("roles", [])
-    if user.get("provider") == "oidc":
-        st.session_state.oidc_id_token = user.get("id_token", "")
-        st.session_state.oidc_access_token = user.get("access_token", "")
-        st.session_state.oidc_refresh_token = user.get("refresh_token", "")
-    else:
-        st.session_state.firebase_id_token = user.get("id_token", "")
-        st.session_state.firebase_refresh_token = user.get("refresh_token", "")
-
-
-def get_current_user() -> dict[str, str] | None:
-    if not st.session_state.get("authenticated"):
-        return None
-    return {
-        "provider": st.session_state.get("auth_provider", "firebase"),
-        "user_id": st.session_state.get("auth_user_id", ""),
-        "username": st.session_state.get("auth_user", ""),
-        "email": st.session_state.get("auth_email", ""),
-        "name": st.session_state.get("auth_name", ""),
-        "groups": st.session_state.get("auth_groups", []),
-        "roles": st.session_state.get("auth_roles", []),
-    }
-
-
-def _social_provider_config(provider: str) -> dict[str, str]:
-    configs = {
-        "google": {
-            "name": "Google",
-            "firebase_provider_id": "google.com",
-            "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
-            "token_endpoint": "https://oauth2.googleapis.com/token",
-            "scope": "openid email profile",
-            "credential_field": "id_token",
-        },
-        "github": {
-            "name": "GitHub",
-            "firebase_provider_id": "github.com",
-            "authorization_endpoint": "https://github.com/login/oauth/authorize",
-            "token_endpoint": "https://github.com/login/oauth/access_token",
-            "scope": "read:user user:email",
-            "credential_field": "access_token",
-        },
-    }
-    if provider not in configs:
-        raise SocialConfigError(f"Unsupported social provider: {provider}")
-    return configs[provider]
-
-
-def _social_secret(provider: str, key: str) -> str | None:
-    provider_key = provider.upper()
-    key_name = key.upper()
-    return (
-        os.getenv(f"{provider_key}_{key_name}")
-        or _get_secret_value(provider, key)
-        or _get_secret_value(f"{provider}_oauth", key)
-        or _get_secret_value("oauth", f"{provider}_{key}")
-        or _get_secret_value("auth", f"{provider}_{key}")
-    )
-
-
-def _social_redirect_uri(provider: str) -> str | None:
-    return (
-        _social_secret(provider, "redirect_uri")
-        or os.getenv("OAUTH_REDIRECT_URI")
-        or _get_secret_value("oauth", "redirect_uri")
-        or os.getenv("APP_BASE_URL")
-        or _get_secret_value("app", "base_url")
-    )
-
-
-def _social_oauth_ready(provider: str) -> bool:
-    return all([
-        _social_secret(provider, "client_id"),
-        _social_secret(provider, "client_secret"),
-        _social_redirect_uri(provider),
-    ])
-
-
-def _social_authorization_url(provider: str) -> str:
-    config = _social_provider_config(provider)
-    client_id = _social_secret(provider, "client_id")
-    redirect_uri = _social_redirect_uri(provider)
-    if not client_id or not _social_secret(provider, "client_secret") or not redirect_uri:
-        raise SocialConfigError(
-            f"{config['name']} sign-in needs {provider.upper()}_CLIENT_ID, "
-            f"{provider.upper()}_CLIENT_SECRET, and APP_BASE_URL."
-        )
-    state = f"{provider}:{secrets.token_urlsafe(24)}"
-    states = st.session_state.setdefault("social_oauth_states", {})
-    states[state] = provider
-    if len(states) > 20:
-        for old_state in list(states)[:-20]:
-            states.pop(old_state, None)
-    params = {
-        "client_id": client_id,
-        "redirect_uri": redirect_uri.rstrip("/"),
-        "response_type": "code",
-        "scope": config["scope"],
-        "state": state,
-    }
-    if provider == "google":
-        params["prompt"] = "select_account"
-    if provider == "github":
-        params["allow_signup"] = "true"
-    return f"{config['authorization_endpoint']}?{urlencode(params)}"
-
-
-def _exchange_social_oauth_code(provider: str, code: str) -> dict[str, str]:
-    config = _social_provider_config(provider)
-    client_id = _social_secret(provider, "client_id")
-    client_secret = _social_secret(provider, "client_secret")
-    redirect_uri = _social_redirect_uri(provider)
-    if not client_id or not client_secret or not redirect_uri:
-        raise SocialConfigError(f"{config['name']} sign-in is missing OAuth client settings.")
-    token_response = requests.post(
-        config["token_endpoint"],
-        data={
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": redirect_uri.rstrip("/"),
-            "client_id": client_id,
-            "client_secret": client_secret,
-        },
-        headers={"Accept": "application/json"},
-        timeout=20,
-    )
-    try:
-        token_data = token_response.json()
-    except ValueError:
-        token_data = {}
-    if not token_response.ok:
-        error = token_data.get("error_description") or token_data.get("error") or token_response.text
-        raise SocialAuthError(f"{config['name']} sign-in failed: {error}")
-    credential_field = config["credential_field"]
-    credential_value = token_data.get(credential_field)
-    if provider == "google" and not credential_value:
-        credential_field = "access_token"
-        credential_value = token_data.get("access_token")
-    if not credential_value:
-        raise SocialAuthError(f"{config['name']} did not return a usable OAuth token.")
-    firebase_data = _firebase_request(
-        "accounts:signInWithIdp",
-        {
-            "postBody": urlencode({
-                credential_field: credential_value,
-                "providerId": config["firebase_provider_id"],
-            }),
-            "requestUri": redirect_uri.rstrip("/"),
+def firebase_signin_with_idp(provider: str, token: str) -> tuple[bool, str]:
+    cfg = PROVIDERS[provider]
+    key = "id_token" if provider in ("google", "microsoft") else "access_token"
+    r = requests.post(
+        FIREBASE_IDP_URL,
+        json={
+            "postBody":            f"{key}={token}&providerId={cfg['fb_provider']}",
+            "requestUri":          APP_REDIRECT_URI,
+            "returnSecureToken":   True,
             "returnIdpCredential": True,
-            "returnSecureToken": True,
         },
+        timeout=10,
     )
-    user = _user_from_firebase(firebase_data)
-    user["provider"] = config["firebase_provider_id"]
-    return user
+    if r.status_code != 200:
+        return False, _firebase_err(r)
+    save_session(r.json())   # save_session → touch_activity internally
+    return True, "Signed in"
 
+def handle_oauth_callback() -> None:
+    """
+    Processes query params on every render.
 
-def _handle_social_oauth_callback() -> None:
-    code = st.query_params.get("code")
-    state = st.query_params.get("state")
-    error = st.query_params.get("error")
-    if not state or not any(str(state).startswith(f"{p}:") for p in ("google", "github")):
-        return
-    if error:
-        description = st.query_params.get("error_description") or error
+    Two cases:
+      ?_heartbeat=<epoch>   — JS heartbeat ping → touch_activity() then clear
+      ?code=…&state=…       — OAuth provider redirect → exchange + sign in
+    """
+    qp = st.query_params
+
+    # ── JS heartbeat ping ────────────────────────────────────────────────────
+    if qp.get("_heartbeat"):
+        touch_activity()
         st.query_params.clear()
-        st.error(f"Social sign-in failed: {description}")
+        return   # heartbeat render: nothing else to process
+
+    # ── OAuth redirect ───────────────────────────────────────────────────────
+    code  = qp.get("code")
+    state = qp.get("state")
+    if not code or not state or ":" not in state:
         return
-    if not code:
+    provider, nonce = state.split(":", 1)
+    if provider not in PROVIDERS:
         return
-    states = st.session_state.get("social_oauth_states", {})
-    provider = states.pop(state, None)
-    if not provider:
+    if st.session_state.get(f"oauth_state_{provider}") != nonce:
+        st.error("OAuth state mismatch")
         st.query_params.clear()
-        st.error("Social sign-in expired. Please try again.")
         return
     try:
-        user = _exchange_social_oauth_code(provider, code)
-    except (FirebaseAuthError, FirebaseConfigError, SocialAuthError, SocialConfigError) as exc:
-        st.query_params.clear()
-        st.error(str(exc))
-        return
-    _set_auth_session(user)
+        token = exchange_code(provider, code)
+        ok, msg = firebase_signin_with_idp(provider, token)
+        if not ok:
+            st.error(f"{provider} sign-in failed: {msg}")
+        else:
+            touch_activity()   # explicit touch after successful OAuth flow
+    except Exception as e:
+        st.error(f"OAuth error: {e}")
     st.query_params.clear()
-    st.rerun()
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. Inactivity tracking
+# ─────────────────────────────────────────────────────────────────────────────
+def touch_activity() -> None:
+    """
+    Reset the idle timer.
 
-# ─────────────────────────────────────────────
-#  UI HELPERS
-# ─────────────────────────────────────────────
+    Called from:
+      • save_session()              — every successful sign-in / sign-up
+      • password_reset()            — password-reset form submit
+      • oauth_url()                 — OAuth button click
+      • firebase_signin_with_idp()  — OAuth callback completion
+      • handle_oauth_callback()     — JS heartbeat ping
+      • render_login() form submits — explicit call before each auth call
+      • _confirm_logout() Cancel    — cancelling the dialog
+      • main() sidebar/top-bar btns — opening the logout dialog
+      • main() top of render loop   — catch-all for every other interaction
+    """
+    st.session_state["last_activity"] = int(time.time())
+    st.session_state.pop("_idle_warning_shown", None)   # re-arm warning
 
-def _render_auth_styles() -> None:
-    st.markdown(
-        """
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+def check_inactivity() -> bool:
+    """
+    Server-side hard gate.
+    Returns True  → still active.
+    Returns False → timed out; session cleared, _idle_logout flag set.
+    """
+    if "auth" not in st.session_state:
+        return False
+    now  = int(time.time())
+    last = st.session_state.get("last_activity")
+    if last is None:
+        st.session_state["last_activity"] = now
+        return True
+    if now - last > INACTIVITY_TIMEOUT_SEC:
+        clear_session()
+        st.session_state["_idle_logout"] = True
+        return False
+    return True
 
-        /* ── Global ── */
-        #MainMenu, footer, header { visibility: hidden; }
-        html, body { font-family: 'Inter', sans-serif !important; }
-        .stApp { background: #f7f4f0 !important; }
+def _idle_remaining() -> int:
+    """Seconds until idle logout (≥ 0)."""
+    last = st.session_state.get("last_activity", int(time.time()))
+    return max(0, INACTIVITY_TIMEOUT_SEC - (int(time.time()) - last))
 
-        /* Remove ALL default container padding */
-        [data-testid="block-container"] {
-            padding-top: 0 !important;
-            padding-bottom: 0 !important;
-            padding-left: 0 !important;
-            padding-right: 0 !important;
-            max-width: 100% !important;
-        }
-        [data-testid="stAppViewContainer"] > section > div {
-            padding: 0 !important;
-            gap: 0 !important;
-        }
-        /* Remove gap between columns */
-        [data-testid="stHorizontalBlock"] {
-            gap: 0 !important;
-            padding: 0 !important;
-            align-items: stretch !important;
-            min-height: 100vh !important;
-        }
-        [data-testid="stHorizontalBlock"] > div { display: flex !important; }
-        [data-testid="stHorizontalBlock"] > div > div { flex: 1 !important; }
-        [data-testid="stVerticalBlockBorderWrapper"] {
-            padding: 0 !important;
-        }
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. JS heartbeat injector
+# ─────────────────────────────────────────────────────────────────────────────
+def inject_heartbeat_js() -> None:
+    """
+    Injects a self-contained <script> block that:
 
-        /* ── LEFT column background ── */
-        [data-testid="stHorizontalBlock"] > div:first-child > div {
-            background: linear-gradient(160deg, #faf8f5 0%, #ede8e0 100%) !important;
-            padding: 0 !important;
-        }
-        [data-testid="stHorizontalBlock"] > div:first-child > div > div {
-            padding: 0 !important;
-        }
+    Activity detection
+      Listens for mousemove / mousedown / keydown / touchstart / scroll / wheel
+      on document (passive, 2-second client-side throttle).
+      Resets a JS-side lastActivity timestamp and dismisses any visible warning.
 
-        /* ── RIGHT column background ── */
-        [data-testid="stHorizontalBlock"] > div:last-child > div {
-            background: #ffffff !important;
-            padding: 0 !important;
-            box-shadow: -8px 0 40px rgba(0,0,0,0.07) !important;
-        }
-        [data-testid="stHorizontalBlock"] > div:last-child > div > div {
-            padding: 0 !important;
-        }
+    Tab visibility
+      Pauses all timers while document.hidden is true.
+      On becoming visible again, resets lastActivity so the tab re-entering
+      focus doesn't immediately count the hidden time as idle.
 
-        /* ── Tabs ── */
-        .stTabs [data-baseweb="tab-list"] {
-            background: transparent !important;
-            gap: 0 !important;
-            border-bottom: 2px solid #ede8e0 !important;
-        }
-        .stTabs [data-baseweb="tab"] {
-            background: transparent !important;
-            color: #9ca3af !important;
-            font-size: 14px !important;
-            font-weight: 500 !important;
-            padding: 12px 20px !important;
-            border-radius: 0 !important;
-            border-bottom: 2px solid transparent !important;
-            margin-bottom: -2px !important;
-            font-family: 'Inter', sans-serif !important;
-        }
-        .stTabs [aria-selected="true"] {
-            color: #9D174D !important;
-            border-bottom: 2px solid #9D174D !important;
-        }
-        .stTabs [data-baseweb="tab-highlight"],
-        .stTabs [data-baseweb="tab-border"] { display: none !important; }
-        /* Remove tab content padding */
-        .stTabs [data-baseweb="tab-panel"] { padding-top: 12px !important; }
+    Warning overlay (shown IDLE_WARN_SEC before timeout)
+      • Amber fixed banner at top of viewport with live "X m Ys" countdown
+        and an "I'm still here" button.
+      • Centred modal with the same countdown, a "Stay signed in" primary
+        button, and a "Sign out now" secondary that clicks the sidebar button.
+      Dismissed instantly by any user input event.
 
-        /* ── Inputs ── */
-        .stTextInput input {
-            background: #fff !important;
-            border: 1.5px solid #e5e7eb !important;
-            border-radius: 10px !important;
-            color: #111827 !important;
-            font-size: 14px !important;
-            padding: 11px 14px !important;
-            font-family: 'Inter', sans-serif !important;
-            transition: border-color 0.15s, box-shadow 0.15s !important;
-        }
-        .stTextInput input:focus {
-            border-color: #9D174D !important;
-            box-shadow: 0 0 0 3px rgba(157,23,77,0.10) !important;
-            outline: none !important;
-        }
-        .stTextInput input::placeholder { color: #d1d5db !important; }
-        .stTextInput > div > div { border-radius: 10px !important; }
+    Heartbeat ping
+      When the user has been active since the last ping, the script navigates
+      to ?_heartbeat=<epoch> every HEARTBEAT_INTERVAL_SEC seconds.
+      handle_oauth_callback() catches the param, calls touch_activity(), and
+      clears the param so the URL stays clean.
+      Inactive tabs are deliberately NOT pinged — Python's check_inactivity()
+      will handle the hard timeout.
 
-        /* ── Primary button ── */
-        .stButton > button {
-            background: #9D174D !important;
-            border: none !important;
-            color: #fff !important;
-            font-weight: 600 !important;
-            font-size: 14px !important;
-            border-radius: 10px !important;
-            padding: 13px 20px !important;
-            width: 100% !important;
-            letter-spacing: 0.2px !important;
-            font-family: 'Inter', sans-serif !important;
-            transition: background 0.18s, transform 0.15s, box-shadow 0.15s !important;
-        }
-        .stButton > button:hover {
-            background: #7d1340 !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 6px 20px rgba(157,23,77,0.30) !important;
-        }
+    Idempotency
+      window.__sntiHB guards against double-injection across Streamlit reruns.
+    """
+    timeout_ms  = INACTIVITY_TIMEOUT_SEC * 1000
+    warn_ms     = IDLE_WARN_SEC * 1000
+    interval_ms = HEARTBEAT_INTERVAL_SEC * 1000
 
-        /* ── Checkbox label ── */
-        .stCheckbox label p,
-        .stCheckbox [data-testid="stCheckboxLabel"] p {
-            font-size: 13px !important;
-            color: #6b7280 !important;
-            font-family: 'Inter', sans-serif !important;
-        }
+    st.markdown(f"""
+<script>
+(function() {{
+  if (window.__sntiHB) return;
+  window.__sntiHB = true;
 
-        /* ── Form border ── */
-        [data-testid="stForm"] {
-            border: none !important;
-            padding: 0 !important;
-            background: transparent !important;
-            margin: 0 !important;
-        }
-        /* Tighten form element spacing */
-        [data-testid="stForm"] .stTextInput { margin-bottom: 0 !important; }
-        [data-testid="stForm"] .stCheckbox { margin: 0 !important; padding: 0 !important; }
-        [data-testid="stFormSubmitButton"] { margin-top: 4px !important; }
+  const TIMEOUT_MS  = {timeout_ms};
+  const WARN_MS     = {warn_ms};
+  const INTERVAL_MS = {interval_ms};
 
-        /* ── Alerts ── */
-        [data-testid="stAlert"] { border-radius: 10px !important; font-size: 13px !important; }
+  let lastActivity = Date.now();
+  let tabVisible   = !document.hidden;
+  let lastPing     = Date.now();
+  let warnVisible  = false;
+  let countdownEl  = null;   // banner span
+  let modalCdEl    = null;   // modal span
+  let tickTimer    = null;
 
-        /* ── Social buttons ── */
-        .snti-social-btn {
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-            width: 100%; padding: 11px 16px; border-radius: 10px;
-            border: 1.5px solid #e5e7eb; background: #fff; color: #374151;
-            font-weight: 500; font-size: 14px; cursor: pointer;
-            transition: border-color 0.18s, background 0.18s, box-shadow 0.15s;
-            margin-bottom: 10px; font-family: 'Inter', sans-serif;
-        }
-        .snti-social-btn:hover {
-            border-color: #9D174D; background: #fdf7f9;
-            box-shadow: 0 2px 8px rgba(157,23,77,0.08);
-        }
-        .snti-divider {
-            display: flex; align-items: center; gap: 12px;
-            margin: 22px 0 16px; color: #c4b9b0; font-size: 11px;
-            font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px;
-        }
-        .snti-divider::before, .snti-divider::after {
-            content: ''; flex: 1; height: 1px; background: #ede8e0;
-        }
-        .snti-footer {
-            display: flex; align-items: center; justify-content: center;
-            gap: 6px; margin-top: 16px; color: #c0c4cc; font-size: 12px;
-            font-family: 'Inter', sans-serif;
-        }
-        .snti-sso-btn {
-            display: inline-flex; align-items: center; justify-content: center;
-            width: 100%; padding: 13px 20px; background: #9D174D; color: #fff !important;
-            font-weight: 600; font-size: 14px; border-radius: 10px;
-            text-decoration: none !important; font-family: 'Inter', sans-serif;
-            transition: background 0.18s, transform 0.15s, box-shadow 0.15s;
-        }
-        .snti-sso-btn:hover {
-            background: #7d1340; transform: translateY(-1px);
-            box-shadow: 0 6px 18px rgba(157,23,77,0.28);
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+  // ── Utilities ────────────────────────────────────────────────────────────
+  function msRemaining() {{
+    return Math.max(0, TIMEOUT_MS - (Date.now() - lastActivity));
+  }}
 
+  function fmtMs(ms) {{
+    const s = Math.ceil(ms / 1000);
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m > 0 ? m + 'm ' + r + 's' : r + 's';
+  }}
 
-def _render_left_panel() -> None:
-    """Full-height branding panel rendered inside the left st.column."""
-    st.markdown(
-        """<div style="padding:28px 40px;box-sizing:border-box;position:relative;overflow:hidden;"><div style="position:absolute;bottom:0;left:0;right:0;height:120px;background:radial-gradient(ellipse 90% 60% at 40% 120%, rgba(157,23,77,0.12) 0%, transparent 70%);pointer-events:none;"></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><div style="width:36px;height:36px;background:#9D174D;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 12px rgba(157,23,77,0.35);">🤖</div><span style="font-size:16px;font-weight:700;color:#9D174D;letter-spacing:-0.3px;">SNTI AI</span></div><div style="max-width:340px;position:relative;z-index:1;"><p style="color:#9D174D;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin:0 0 6px 0;">Welcome Back</p><h1 style="color:#1e1b4b;font-size:26px;font-weight:700;line-height:1.25;margin:0 0 8px 0;">Sign in to <span style="color:#9D174D;">SNTI AI</span> Assistant</h1><p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 16px 0;">Access your workspace to continue research, analyze data, write code, and more with your AI assistant.</p><div style="display:flex;flex-direction:column;gap:10px;"><div style="display:flex;align-items:flex-start;gap:10px;"><div style="width:36px;height:36px;flex-shrink:0;background:rgba(157,23,77,0.08);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">🛡️</div><div><p style="color:#1e1b4b;font-size:13px;font-weight:600;margin:0 0 1px 0;">Secure &amp; Private</p><p style="color:#9ca3af;font-size:12px;margin:0;line-height:1.35;">Enterprise-grade security to keep your data safe.</p></div></div><div style="display:flex;align-items:flex-start;gap:10px;"><div style="width:36px;height:36px;flex-shrink:0;background:rgba(157,23,77,0.08);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">⚡</div><div><p style="color:#1e1b4b;font-size:13px;font-weight:600;margin:0 0 1px 0;">AI-Powered Productivity</p><p style="color:#9ca3af;font-size:12px;margin:0;line-height:1.35;">Research, code, analyze, and innovate faster.</p></div></div><div style="display:flex;align-items:flex-start;gap:10px;"><div style="width:36px;height:36px;flex-shrink:0;background:rgba(157,23,77,0.08);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">☁️</div><div><p style="color:#1e1b4b;font-size:13px;font-weight:600;margin:0 0 1px 0;">Sync Everywhere</p><p style="color:#9ca3af;font-size:12px;margin:0;line-height:1.35;">Access your workspace across all your devices.</p></div></div></div></div></div>""",
-        unsafe_allow_html=True,
-    )
+  function ping() {{
+    const url = new URL(window.location.href);
+    url.searchParams.set('_heartbeat', Date.now());
+    window.location.href = url.toString();
+  }}
 
+  // ── Warning UI ────────────────────────────────────────────────────────────
+  function showWarning() {{
+    if (warnVisible) return;
+    warnVisible = true;
 
-def _sp(px: int = 12) -> None:
-    """Vertical spacer."""
-    st.markdown(f'<div style="height:{px}px"></div>', unsafe_allow_html=True)
+    /* — Banner — */
+    const banner = document.createElement('div');
+    banner.id = 'snti-idle-banner';
+    Object.assign(banner.style, {{
+      position:'fixed', top:'0', left:'0', right:'0', zIndex:'99999',
+      background:'#f59e0b', color:'#1c1917', padding:'10px 16px',
+      display:'flex', alignItems:'center', justifyContent:'space-between',
+      fontFamily:'system-ui,sans-serif', fontSize:'14px', fontWeight:'600',
+      boxShadow:'0 2px 8px rgba(0,0,0,.25)',
+    }});
+    const bannerLeft = document.createElement('span');
+    bannerLeft.innerHTML = '&#9888;&#65039; Session expiring in <span id="snti-cd"></span>';
+    countdownEl = bannerLeft.querySelector('#snti-cd');
 
+    const stayBtn = document.createElement('button');
+    stayBtn.textContent = "I'm still here";
+    Object.assign(stayBtn.style, {{
+      background:'#1c1917', color:'#fef3c7', border:'none',
+      padding:'6px 14px', borderRadius:'6px', cursor:'pointer',
+      fontSize:'13px', fontWeight:'700',
+    }});
+    stayBtn.onclick = function() {{ dismissWarning(); ping(); }};
+    banner.appendChild(bannerLeft);
+    banner.appendChild(stayBtn);
+    document.body.prepend(banner);
 
-def _label(text: str) -> None:
-    st.markdown(
-        f'<p style="font-size:13px;font-weight:500;color:#374151;margin:0 0 6px 0;'
-        f'font-family:Inter,sans-serif;">{text}</p>',
-        unsafe_allow_html=True,
-    )
+    /* — Modal — */
+    const overlay = document.createElement('div');
+    overlay.id = 'snti-idle-modal';
+    Object.assign(overlay.style, {{
+      position:'fixed', inset:'0', zIndex:'100000',
+      background:'rgba(0,0,0,.55)', display:'flex',
+      alignItems:'center', justifyContent:'center',
+    }});
 
+    const box = document.createElement('div');
+    Object.assign(box.style, {{
+      background:'#fff', borderRadius:'16px', padding:'2rem 2.5rem',
+      maxWidth:'380px', width:'90%', textAlign:'center',
+      boxShadow:'0 20px 60px rgba(0,0,0,.3)',
+      fontFamily:'system-ui,sans-serif',
+    }});
+    box.innerHTML = `
+      <div style="font-size:2.5rem;margin-bottom:.75rem">&#9203;</div>
+      <h2 style="margin:0 0 .5rem;font-size:1.2rem;color:#0f172a">Still there?</h2>
+      <p style="color:#64748b;font-size:.9rem;margin:0 0 1.25rem">
+        You'll be automatically signed out in<br>
+        <strong id="snti-modal-cd"
+          style="color:#f59e0b;font-size:1.3rem"></strong>
+      </p>
+      <button id="snti-stay"
+        style="background:#1e3a8a;color:#fff;border:none;padding:.65rem 1.5rem;
+               borderRadius:10px;cursor:pointer;fontSize:.95rem;fontWeight:600;
+               width:100%;marginBottom:.5rem">
+        Stay signed in
+      </button>
+      <button id="snti-signout"
+        style="background:transparent;color:#94a3b8;border:none;
+               padding:.4rem;cursor:pointer;fontSize:.85rem;width:100%">
+        Sign out now
+      </button>`;
+    modalCdEl = box.querySelector('#snti-modal-cd');
+    box.querySelector('#snti-stay').onclick = function() {{ dismissWarning(); ping(); }};
+    box.querySelector('#snti-signout').onclick = function() {{
+      const lb = [...document.querySelectorAll('button')]
+                   .find(b => b.textContent.trim() === 'Log out');
+      if (lb) lb.click();
+    }};
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
 
-def _render_sign_in_form() -> None:
-    with st.form(key="auth_sign_in_form", border=False):
-        _label("Email address")
-        email = st.text_input("si_email", placeholder="you@example.com", label_visibility="collapsed")
-        _sp(8)
-        _label("Password")
-        password = st.text_input("si_password", type="password", placeholder="Enter your password", label_visibility="collapsed")
-        _sp(4)
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            st.checkbox("Keep me signed in", key="si_remember")
-        with col2:
-            st.markdown(
-                '<div style="text-align:right;padding-top:5px;">'
-                '<a href="#" style="font-size:13px;color:#9D174D;font-weight:500;'
-                'text-decoration:none;font-family:Inter,sans-serif;">Forgot password?</a></div>',
-                unsafe_allow_html=True,
-            )
-        submitted = st.form_submit_button("Sign in  →", use_container_width=True)
+    tickTimer = setInterval(updateCountdown, 1000);
+    updateCountdown();
+  }}
 
-    if submitted:
-        try:
-            user = _sign_in(email.strip(), password)
-        except (FirebaseAuthError, FirebaseConfigError) as exc:
-            st.error(str(exc))
-        else:
-            _set_auth_session(user)
-            st.rerun()
+  function updateCountdown() {{
+    const rem   = msRemaining();
+    const label = fmtMs(rem);
+    if (countdownEl) countdownEl.textContent = label;
+    if (modalCdEl)   modalCdEl.textContent   = label;
+    if (rem <= 0) {{
+      clearInterval(tickTimer);
+      dismissWarning();
+      ping();   // final ping — Python will expire the session on next render
+    }}
+  }}
 
+  function dismissWarning() {{
+    warnVisible = false;
+    if (tickTimer) {{ clearInterval(tickTimer); tickTimer = null; }}
+    const b = document.getElementById('snti-idle-banner');
+    const m = document.getElementById('snti-idle-modal');
+    if (b) b.remove();
+    if (m) m.remove();
+    countdownEl = null;
+    modalCdEl   = null;
+  }}
 
-def _render_create_account_form() -> None:
-    with st.form(key="auth_create_form", border=False):
-        _label("Display name")
-        display_name = st.text_input("ca_name", placeholder="Your name", label_visibility="collapsed")
-        _sp(12)
-        _label("Email address")
-        email = st.text_input("ca_email", placeholder="you@example.com", label_visibility="collapsed")
-        _sp(12)
-        _label("Password")
-        password = st.text_input("ca_password", type="password", placeholder="Create a password", label_visibility="collapsed")
-        _sp(12)
-        _label("Confirm password")
-        confirm_password = st.text_input("ca_confirm", type="password", placeholder="Confirm your password", label_visibility="collapsed")
-        _sp(4)
-        submitted = st.form_submit_button("Create account  →", use_container_width=True)
+  // ── User activity events ──────────────────────────────────────────────────
+  let throttled = false;
+  function onActivity() {{
+    if (!tabVisible) return;
+    lastActivity = Date.now();
+    if (warnVisible) dismissWarning();
+    if (throttled) return;
+    throttled = true;
+    setTimeout(function() {{ throttled = false; }}, 2000);
+  }}
+  ['mousemove','mousedown','keydown','touchstart','scroll','wheel']
+    .forEach(function(e) {{
+      document.addEventListener(e, onActivity, {{passive:true}});
+    }});
 
-    if submitted:
-        if len(password) < 8:
-            st.error("Password must be at least 8 characters.")
-            return
-        if password != confirm_password:
-            st.error("Passwords do not match.")
-            return
-        try:
-            user = _create_account(email.strip(), password, display_name.strip())
-        except (FirebaseAuthError, FirebaseConfigError) as exc:
-            st.error(str(exc))
-        else:
-            _set_auth_session(user)
-            st.rerun()
+  // ── Tab visibility ────────────────────────────────────────────────────────
+  document.addEventListener('visibilitychange', function() {{
+    tabVisible = !document.hidden;
+    if (tabVisible) {{
+      // Don't penalise the user for the time the tab was hidden
+      lastActivity = Date.now();
+    }}
+  }});
 
+  // ── Main 1-second polling loop ────────────────────────────────────────────
+  setInterval(function() {{
+    if (!tabVisible) return;
 
-def _render_reset_password_form() -> None:
-    st.markdown(
-        '<p style="color:#6b7280;font-size:14px;margin:0 0 18px 0;line-height:1.65;'
-        'font-family:Inter,sans-serif;">'
-        "Enter your email address and we'll send you a link to reset your password."
-        "</p>",
-        unsafe_allow_html=True,
-    )
-    with st.form(key="auth_reset_form", border=False):
-        _label("Email address")
-        email = st.text_input("rp_email", placeholder="you@example.com", label_visibility="collapsed")
-        _sp(4)
-        submitted = st.form_submit_button("Send reset link  →", use_container_width=True)
+    const rem = msRemaining();
 
-    if submitted:
-        try:
-            _send_password_reset(email.strip())
-        except (FirebaseAuthError, FirebaseConfigError) as exc:
-            st.error(str(exc))
-        else:
-            st.success("✓ Password reset email sent. Check your inbox.")
+    // Show warning overlay when within the warn window
+    if (rem > 0 && rem <= WARN_MS) showWarning();
 
+    // Send heartbeat only when the user has been recently active
+    const sinceLastPing     = Date.now() - lastPing;
+    const sinceLastActivity = Date.now() - lastActivity;
+    if (sinceLastPing >= INTERVAL_MS && sinceLastActivity < INTERVAL_MS + 5000) {{
+      lastPing = Date.now();
+      ping();
+    }}
+  }}, 1000);
 
-def _render_social_auth_buttons(label: str = "or continue with") -> None:
-    st.markdown(
-        f"""
-        <div class="snti-divider">{html.escape(label)}</div>
+}})();
+</script>
+""", unsafe_allow_html=True)
 
-        <button class="snti-social-btn" disabled>
-          <svg width="18" height="18" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-          </svg>
-          Continue with Google
-        </button>
-
-        <button class="snti-social-btn" disabled>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="#24292e">
-            <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-          </svg>
-          Continue with GitHub
-        </button>
-
-        <button class="snti-social-btn" disabled>
-          <svg width="18" height="18" viewBox="0 0 21 21">
-            <path fill="#f25022" d="M1 1h9v9H1z"/>
-            <path fill="#00a4ef" d="M1 11h9v9H1z"/>
-            <path fill="#7fba00" d="M11 1h9v9h-9z"/>
-            <path fill="#ffb900" d="M11 11h9v9h-9z"/>
-          </svg>
-          Continue with Microsoft
-        </button>
-
-        <div class="snti-footer">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9D174D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-          Protected by Firebase Authentication
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def _handle_oidc_callback() -> None:
-    code = st.query_params.get("code")
-    state = st.query_params.get("state")
-    error = st.query_params.get("error")
-    if error:
-        description = st.query_params.get("error_description") or error
-        st.error(f"SSO sign-in failed: {description}")
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. Server-side idle warning banner (fallback for JS-blocked clients)
+# ─────────────────────────────────────────────────────────────────────────────
+def render_idle_warning() -> None:
+    """
+    Renders a Streamlit warning banner when the server-side idle clock is
+    within IDLE_WARN_SEC of the hard timeout.  Acts as a fallback when the
+    JS heartbeat cannot run (no-script environment, Streamlit Cloud sandbox).
+    """
+    rem = _idle_remaining()
+    if rem > IDLE_WARN_SEC:
         return
-    if not code:
-        return
-    try:
-        user = _user_from_oidc(_exchange_oidc_code(code, state or ""))
-        _validate_oidc_access(user)
-    except (OIDCAuthError, OIDCConfigError) as exc:
-        st.query_params.clear()
-        st.error(str(exc))
-        return
-    _set_auth_session(user)
-    st.query_params.clear()
-    st.rerun()
+    m     = rem // 60
+    s     = rem % 60
+    label = f"{m}m {s}s" if m else f"{s}s"
+    st.warning(
+        f"⚠️ **Inactivity warning** — you will be signed out in **{label}**. "
+        "Move the mouse or press any key to stay signed in.",
+    )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. Login UI
+# ─────────────────────────────────────────────────────────────────────────────
+def _inject_css() -> None:
+    st.markdown("""
+    <style>
+      .block-container { padding-top: 2rem; max-width: 1100px; }
+      .snti-hero {
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+        color: #fff; padding: 3rem 2rem; border-radius: 16px; height: 100%;
+      }
+      .snti-hero h1 { font-size: 2.25rem; margin: 0 0 1rem; }
+      .snti-hero p  { opacity: .85; line-height: 1.6; }
+      .snti-card {
+        background: #fff; padding: 2rem; border-radius: 16px;
+        box-shadow: 0 8px 30px rgba(0,0,0,.08);
+      }
+      .snti-divider {
+        display: flex; align-items: center; gap: .75rem;
+        color: #94a3b8; font-size: .8rem; margin: 1rem 0;
+      }
+      .snti-divider::before, .snti-divider::after {
+        content: ""; flex: 1; height: 1px; background: #e2e8f0;
+      }
+      .oauth-btn a {
+        display: flex; align-items: center; justify-content: center; gap: .5rem;
+        width: 100%; padding: .65rem 1rem; border: 1px solid #e2e8f0;
+        border-radius: 10px; text-decoration: none; color: #0f172a !important;
+        font-weight: 500; background: #fff; transition: all .15s;
+      }
+      .oauth-btn a:hover { background: #f8fafc; border-color: #cbd5e1; }
+    </style>
+    """, unsafe_allow_html=True)
 
-def _render_oidc_sign_in(app_name: str) -> None:
-    if not _oidc_ready():
-        _render_oidc_setup_message()
-    _handle_oidc_callback()
-    _render_auth_styles()
-    left_col, right_col = st.columns([1.15, 1], gap="small")
-    with left_col:
-        _render_left_panel()
-    with right_col:
-        st.markdown('<div style="padding:56px 52px 40px 52px;">', unsafe_allow_html=True)
+def _oauth_button(provider: str, icon: str) -> None:
+    cfg = PROVIDERS[provider]
+    if not cfg["client_id"]:
         st.markdown(
-            f'<h2 style="font-size:22px;font-weight:700;color:#1e1b4b;margin:0 0 24px 0;'
-            f'font-family:Inter,sans-serif;">Sign in with {html.escape(_oidc_provider_name())}</h2>',
+            f'<div class="oauth-btn"><a style="opacity:.5;pointer-events:none">'
+            f'{icon} {cfg["label"]} (not configured)</a></div>',
             unsafe_allow_html=True,
         )
-        try:
-            authorization_url = _oidc_authorization_url()
-            st.markdown(
-                f'<a class="snti-sso-btn" href="{html.escape(authorization_url)}" target="_self">'
-                f'Sign in with {html.escape(_oidc_provider_name())}</a>',
-                unsafe_allow_html=True,
-            )
-        except (OIDCAuthError, OIDCConfigError) as exc:
-            st.error(str(exc))
-        st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
+        return
+    url = oauth_url(provider)   # oauth_url() calls touch_activity()
+    st.markdown(
+        f'<div class="oauth-btn"><a href="{url}" target="_self">{icon} {cfg["label"]}</a></div>',
+        unsafe_allow_html=True,
+    )
 
+def render_login() -> None:
+    _inject_css()
+    left, right = st.columns([1, 1], gap="large")
 
-def _render_firebase_setup_message() -> None:
-    _render_auth_styles()
-    project_hint = _firebase_project_id() or "your Firebase project"
-    left_col, right_col = st.columns([1.15, 1], gap="small")
-    with left_col:
-        _render_left_panel()
-    with right_col:
-        st.markdown('<div style="padding:56px 52px 40px 52px;">', unsafe_allow_html=True)
+    with left:
+        st.markdown("""
+        <div class="snti-hero">
+          <h1>SNTI AI Assistant</h1>
+          <p>Secure, provider-agnostic sign-in. Use email or your favourite
+          identity provider — your session refreshes automatically so you
+          stay logged in across reloads.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with right:
+        st.markdown('<div class="snti-card">', unsafe_allow_html=True)
+
+        _oauth_button("google",    "🟢")
+        _oauth_button("github",    "⚫")
+        _oauth_button("microsoft", "🔷")
+
+        st.markdown('<div class="snti-divider">or continue with email</div>',
+                    unsafe_allow_html=True)
+
+        tab_signin, tab_signup, tab_reset = st.tabs(["Sign in", "Sign up", "Forgot password"])
+
+        with tab_signin:
+            with st.form("signin_form", clear_on_submit=False):
+                email = st.text_input("Email",    key="si_email")
+                pw    = st.text_input("Password", type="password", key="si_pw")
+                if st.form_submit_button("Sign in", use_container_width=True, type="primary"):
+                    touch_activity()   # ← form submit
+                    if not email or not pw:
+                        st.error("Email and password are required")
+                    else:
+                        ok, msg = email_signin(email, pw)
+                        (st.success if ok else st.error)(msg)
+                        if ok:
+                            st.rerun()
+
+        with tab_signup:
+            with st.form("signup_form"):
+                email = st.text_input("Email",                  key="su_email")
+                pw    = st.text_input("Password (min 6 chars)", type="password", key="su_pw")
+                pw2   = st.text_input("Confirm password",       type="password", key="su_pw2")
+                if st.form_submit_button("Create account", use_container_width=True, type="primary"):
+                    touch_activity()   # ← form submit
+                    if pw != pw2:
+                        st.error("Passwords do not match")
+                    elif len(pw) < 6:
+                        st.error("Password must be at least 6 characters")
+                    else:
+                        ok, msg = email_signup(email, pw)
+                        (st.success if ok else st.error)(msg)
+                        if ok:
+                            st.rerun()
+
+        with tab_reset:
+            with st.form("reset_form"):
+                email = st.text_input("Email", key="rs_email")
+                if st.form_submit_button("Send reset link", use_container_width=True):
+                    touch_activity()   # ← form submit
+                    ok, msg = password_reset(email)
+                    (st.success if ok else st.error)(msg)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 10. Auth gate
+# ─────────────────────────────────────────────────────────────────────────────
+def require_login() -> dict[str, Any]:
+    """
+    Must be the first call inside main().
+
+    Execution order
+    ───────────────
+    a) Restore session from disk
+    b) Handle OAuth redirect OR JS heartbeat ping (both via query params)
+    c) Fast-path: if auth exists, token is fresh, and session is active → return
+    d) Show idle-logout banner from the previous render (if applicable)
+    e) Fall through to login page + stop
+    """
+    hydrate_from_disk()      # a
+    handle_oauth_callback()  # b
+
+    # c — all three checks in one branch; short-circuits on the happy path
+    if (
+        "auth" in st.session_state
+        and ensure_fresh_token()
+        and check_inactivity()
+    ):
+        return st.session_state["auth"]
+
+    # d — check_inactivity() may have just cleared the session and set this flag
+    if st.session_state.pop("_idle_logout", False):
         st.warning(
-            f"**Firebase not configured.** Add `FIREBASE_WEB_API_KEY` for {project_hint} "
-            "and restart Streamlit."
+            f"You were logged out after {INACTIVITY_TIMEOUT_MIN} minutes of inactivity."
         )
-        st.code(
-            "FIREBASE_WEB_API_KEY=your_firebase_web_api_key\n"
-            "FIREBASE_PROJECT_ID=your_firebase_project_id",
-            language="env",
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
+
+    # e — no valid session; show login and stop
+    render_login()
     st.stop()
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 11. Logout confirmation dialog
+# ─────────────────────────────────────────────────────────────────────────────
+@st.dialog("Confirm logout")
+def _confirm_logout() -> None:
+    st.write("Are you sure you want to log out? Your saved session will be cleared.")
+    col_yes, col_no = st.columns(2)
+    with col_yes:
+        if st.button("Yes, log out", type="primary", use_container_width=True):
+            clear_session()
+            st.rerun()
+    with col_no:
+        if st.button("Cancel", use_container_width=True):
+            touch_activity()   # cancelling the dialog = user is still here
+            st.rerun()
 
-def _render_oidc_setup_message() -> None:
-    _render_auth_styles()
-    left_col, right_col = st.columns([1.15, 1], gap="small")
-    with left_col:
-        _render_left_panel()
-    with right_col:
-        st.markdown('<div style="padding:56px 52px 40px 52px;">', unsafe_allow_html=True)
-        st.warning("**Enterprise SSO not configured.** Set the OIDC environment variables below.")
-        st.code(
-            "AUTH_PROVIDER=oidc\n"
-            "OIDC_PROVIDER_NAME=Azure AD\n"
-            "OIDC_DISCOVERY_URL=https://login.microsoftonline.com/<tenant>/v2.0/.well-known/openid-configuration\n"
-            "OIDC_CLIENT_ID=your_client_id\n"
-            "OIDC_CLIENT_SECRET=your_client_secret\n"
-            "OIDC_REDIRECT_URI=http://localhost:8501\n"
-            "OIDC_SCOPES=openid profile email",
-            language="env",
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
+# ─────────────────────────────────────────────────────────────────────────────
+# 12. Main app
+# ─────────────────────────────────────────────────────────────────────────────
+def main() -> None:
+    st.set_page_config(page_title="SNTI AI Assistant", page_icon="🤖", layout="wide")
 
+    if not FIREBASE_API_KEY:
+        st.error("FIREBASE_API_KEY is not set. Add it to your .env file.")
+        st.stop()
 
-# ─────────────────────────────────────────────
-#  PUBLIC API
-# ─────────────────────────────────────────────
+    # ── Step 1: Auth gate ─────────────────────────────────────────────────────
+    #    Handles: disk hydration · OAuth/heartbeat callback · inactivity gate ·
+    #             token refresh.  Returns auth dict or calls st.stop().
+    user = require_login()
 
-def require_login(app_name: str = "SNTI AI Assistant") -> dict[str, str]:
-    """
-    Gate the app behind authentication.
+    # ── Step 2: Inject JS heartbeat ───────────────────────────────────────────
+    #    Must come AFTER require_login so unauthenticated renders don't get it.
+    #    Idempotent — window.__sntiHB guard prevents double-injection.
+    inject_heartbeat_js()
 
-    Call this at the very top of your main Streamlit script:
+    # ── Step 3: Touch activity — catch-all for every Streamlit render ─────────
+    #    Any widget interaction that didn't call touch_activity() explicitly
+    #    is captured here because Streamlit reruns on every interaction.
+    touch_activity()
 
-        user = require_login()
-        st.write(f"Hello, {user['name']}!")
+    # ── Step 4: Server-side idle warning banner (JS-off fallback) ─────────────
+    render_idle_warning()
 
-    Returns the current user dict when authenticated; otherwise renders
-    the login UI and calls st.stop().
+    # ── Step 5: Sidebar ───────────────────────────────────────────────────────
+    with st.sidebar:
+        if user.get("photoUrl"):
+            st.image(user["photoUrl"], width=64)
+        st.markdown(f"**{user.get('displayName') or user['email']}**")
+        st.caption(f"Provider: `{user.get('provider', 'password')}`")
 
-    Also add this to your .streamlit/config.toml for best results:
+        token_rem = max(0, user["expiresAt"] - int(time.time()))
+        st.caption(f"Token expires in: {token_rem // 60}m {token_rem % 60}s")
 
-        [server]
-        headless = true
+        idle_rem = _idle_remaining()
+        st.caption(f"Idle timeout in: {idle_rem // 60}m {idle_rem % 60}s")
 
-        [theme]
-        base = "light"
-    """
-    if st.query_params.get("logout") == "1":
-        _clear_auth_session()
-        st.query_params.clear()
-        st.rerun()
+        st.divider()
+        if st.button("Log out", use_container_width=True):
+            touch_activity()    # opening the dialog = interaction
+            _confirm_logout()
 
-    current_user = get_current_user()
-    if current_user:
-        return current_user
+    # ── Step 6: Top bar ───────────────────────────────────────────────────────
+    col_title, col_user, col_logout = st.columns([6, 2, 1])
+    with col_title:
+        st.title("SNTI AI Assistant")
+    with col_user:
+        st.markdown(f"**{user.get('displayName') or user['email']}**")
+        st.caption(f"via {user.get('provider', 'password')}")
+    with col_logout:
+        if st.button("Log out", type="secondary", use_container_width=True, key="top_logout"):
+            touch_activity()
+            _confirm_logout()
 
-    # Inject global CSS
-    _render_auth_styles()
+    st.divider()
 
-    # OIDC / SSO path (Azure AD, Okta, etc.)
-    if _auth_provider() in {"oidc", "sso", "azure", "okta"}:
-        _render_oidc_sign_in(app_name)
+    # ── Step 7: App body ──────────────────────────────────────────────────────
+    st.write(f"Welcome, **{user.get('displayName') or user['email']}** 👋")
+    st.info("You're signed in. Tokens refresh automatically — feel free to reload.")
 
-    # Firebase API key missing
-    if not _firebase_api_key():
-        _render_firebase_setup_message()
-
-    # Handle OAuth redirects before rendering forms
-    _handle_social_oauth_callback()
-
-    # ── Two-column split layout ────────────────
-    left_col, right_col = st.columns([1.15, 1], gap="small")
-
-    with left_col:
-        _render_left_panel()
-
-    with right_col:
-        # Inner padding wrapper
-        st.markdown('<div style="padding:28px 44px 24px 44px;">', unsafe_allow_html=True)
-
-        sign_in_tab, create_tab, reset_tab = st.tabs(
-            ["Sign in", "Create account", "Reset password"]
-        )
-
-        with sign_in_tab:
-            _render_sign_in_form()
-            _render_social_auth_buttons()
-
-        with create_tab:
-            _render_create_account_form()
-            _render_social_auth_buttons()
-
-        with reset_tab:
-            _render_reset_password_form()
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    st.stop()
+    # ── Place your real app widgets below this line ───────────────────────────
 
 
-def logout_link(label: str = "Logout") -> str:
-    """Return an HTML anchor that logs the user out when clicked."""
-    return f'<a href="?logout=1" title="{label}" class="tda-icon-btn">{label}</a>'
+if __name__ == "__main__":
+    main()
