@@ -80,6 +80,7 @@ def answer_query(
     temperature=0.2,
     user_id="anonymous",
     user_context=None,
+    use_rag=False,
 ):
     started_at = time.perf_counter()
     settings = get_settings()
@@ -278,27 +279,36 @@ def answer_query(
         )
         return _result(response, include_trace, trace)
 
-    retrieved_context = retrieve_context(
-        latest_question,
-        allowed_sources=access_policy.allowed_sources if access_policy.enabled else None,
-    )
-    context_text = format_context(retrieved_context)
-    context_budget = trim_to_token_budget(context_text, settings.max_context_tokens)
-    context_text = context_budget.text
-    trace["token_budget"]["context_tokens_est"] = context_budget.original_tokens
-    trace["token_budget"]["context_trimmed"] = context_budget.trimmed
-    trace["used_context_count"] = len(retrieved_context)
-    trace["bq_hits"] = len([item for item in retrieved_context if item.get("backend") == "bigquery"])
-    trace["json_hits"] = len([item for item in retrieved_context if item.get("backend") == "json"])
-    trace["context_sources"] = [
-        {
-            "title": item.get("title"),
-            "source": item.get("source"),
-            "backend": item.get("backend", "unknown"),
-            "score": item.get("score"),
-        }
-        for item in retrieved_context
-    ]
+    # RAG Retrieval - only when use_rag=True
+    if use_rag:
+        retrieved_context = retrieve_context(
+            latest_question,
+            allowed_sources=access_policy.allowed_sources if access_policy.enabled else None,
+        )
+        context_text = format_context(retrieved_context)
+        context_budget = trim_to_token_budget(context_text, settings.max_context_tokens)
+        context_text = context_budget.text
+        trace["token_budget"]["context_tokens_est"] = context_budget.original_tokens
+        trace["token_budget"]["context_trimmed"] = context_budget.trimmed
+        trace["used_context_count"] = len(retrieved_context)
+        trace["bq_hits"] = len([item for item in retrieved_context if item.get("backend") == "bigquery"])
+        trace["json_hits"] = len([item for item in retrieved_context if item.get("backend") == "json"])
+        trace["context_sources"] = [
+            {
+                "title": item.get("title"),
+                "source": item.get("source"),
+                "backend": item.get("backend", "unknown"),
+                "score": item.get("score"),
+            }
+            for item in retrieved_context
+        ]
+    else:
+        retrieved_context = []
+        context_text = ""
+        trace["used_context_count"] = 0
+        trace["bq_hits"] = 0
+        trace["json_hits"] = 0
+        trace["context_sources"] = []
     cache_key = answer_cache.make_key(
         latest_question,
         effective_model_choice,

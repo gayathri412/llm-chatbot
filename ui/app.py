@@ -220,19 +220,19 @@ button[kind="header"],
    🌑  DARK THEME  —  SNTI AI
    ══════════════════════════════════════════════ */
 
-/* CSS Variables — swap these to change the whole theme */
+/* CSS Variables — GOLD PROFESSIONAL THEME */
 :root {
     --bg-base:      #0a0a0a;   /* page background          */
-    --bg-surface:   #141414;   /* header / sidebar         */
-    --bg-card:      #1c1c1c;   /* cards / input box        */
+    --bg-surface:   #111111;   /* header / sidebar         */
+    --bg-card:      #1a1a1a;   /* cards / input box        */
     --bg-hover:     #252525;   /* hover state              */
-    --border:       #2a2a2a;   /* borders                  */
-    --accent:       #00c2ff;   /* cyan-blue accent         */
-    --accent-dark:  #0077b6;   /* darker accent            */
-    --text-primary: #f0f0f0;   /* main text                */
-    --text-muted:   #888;      /* secondary text           */
-    --text-dim:     #555;      /* dim icons                */
-    --glow:         rgba(0, 194, 255, 0.15);
+    --border:       #333333;   /* borders                  */
+    --accent:       #fbbf24;   /* gold accent              */
+    --accent-dark:  #d97706;   /* darker gold              */
+    --text-primary: #ffffff;   /* main text                */
+    --text-muted:   #a0a0a0;  /* secondary text           */
+    --text-dim:     #666666;  /* dim icons                */
+    --glow:         rgba(251, 191, 36, 0.2);
 }
 
 /* Full page background */
@@ -277,7 +277,7 @@ button[kind="header"],
 }
 .tda-header-right { display: flex; align-items: center; gap: 10px; }
 .tda-badge {
-    background: linear-gradient(135deg, #0077b6, #00c2ff);
+    background: linear-gradient(135deg, #d97706, #fbbf24);
     color: #000; font-size: 11px; font-weight: 700;
     padding: 3px 10px; border-radius: 12px; letter-spacing: 0.5px;
 }
@@ -290,7 +290,7 @@ button[kind="header"],
 .tda-icon-btn:hover { background: var(--bg-hover); color: var(--accent); }
 .tda-avatar {
     width: 34px; height: 34px; border-radius: 50%;
-    background: linear-gradient(135deg, #0077b6, #00c2ff);
+    background: linear-gradient(135deg, #d97706, #fbbf24);
     display: flex; align-items: center; justify-content: center;
     color: #000; font-weight: 700; font-size: 13px;
     box-shadow: 0 0 10px var(--glow);
@@ -387,52 +387,69 @@ button[kind="header"],
     color: var(--text-primary) !important;
 }
 
-/* ── BOTTOM INPUT BAR (stChatInput) — sits ABOVE the toolbar ── */
+/* ── BOTTOM INPUT BAR — PROFESSIONAL GOLD STYLING ── */
 [data-testid="stChatInput"] {
-    position: fixed !important; bottom: 9px !important;
-    left: 54px !important; right: 0 !important;
-    background: var(--bg-surface) !important;
-    padding: 1px 32px 1px !important;
-    border-top: none !important;
+    position: fixed !important; 
+    bottom: 12px !important;
+    left: 54px !important; 
+    right: 0 !important;
+    background: transparent !important;
+    border: none !important; 
+    margin: 0 !important; 
+    padding: 0 !important;
     z-index: 1000;
 }
 [data-testid="stChatInput"] > div {
-    max-width: 1000px;
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px;
-    box-shadow: 0 0 12px rgba(0,0,0,0.4);
-    min-height: 30px !important;
-    padding-left: 0 !important;
-    padding-right: 4px !important;
-    position: relative !important;
+    max-width: 900px;
+    background: linear-gradient(145deg, #1a1a1a, #141414) !important;
+    border: 1px solid #3a3a3a !important;
+    border-radius: 24px !important;
+    padding: 8px 12px 8px 18px !important;
+    margin: 0 auto !important;
+    min-height: 52px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(251,191,36,0.1) !important;
+    transition: all 0.2s ease !important;
+}
+[data-testid="stChatInput"] > div:hover {
+    border-color: #4a4a4a !important;
+    box-shadow: 0 4px 25px rgba(0,0,0,0.5), 0 0 0 1px rgba(251,191,36,0.15) !important;
 }
 [data-testid="stChatInput"] > div:focus-within {
     border-color: var(--accent) !important;
-    box-shadow: 0 0 0 3px var(--glow) !important;
+    box-shadow: 0 0 20px rgba(251,191,36,0.15), 0 0 0 2px var(--accent) !important;
 }
 [data-testid="stChatInput"] textarea {
     background: transparent !important;
     color: var(--text-primary) !important;
     caret-color: var(--accent) !important;
-    min-height: 22px !important;
-    max-height: 58px !important;
-    padding-top: 2px !important;
-    padding-bottom: 2px !important;
-    padding-right: 158px !important;
-    font-size: 14px !important;
+    border: none !important;
+    outline: none !important;
+    resize: none !important;
+    min-height: 36px !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+    padding-right: 160px !important;
+    font-size: 15px !important;
+    font-weight: 400 !important;
 }
 [data-testid="stChatInput"] textarea::placeholder {
-    color: var(--text-dim) !important;
+    color: #555555 !important;
+    font-weight: 400 !important;
 }
-/* Send arrow button inside chat input */
+/* Send button — GOLD */
 [data-testid="stChatInput"] button {
-    background: linear-gradient(135deg, #0077b6, #00c2ff) !important;
-    border-radius: 9px !important;
+    background: linear-gradient(135deg, #d97706, #fbbf24) !important;
+    border-radius: 12px !important;
     color: #000 !important;
-    width: 30px !important;
-    height: 30px !important;
-    min-height: 30px !important;
+    width: 36px !important;
+    height: 36px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(251,191,36,0.3) !important;
+}
+[data-testid="stChatInput"] button:hover {
+    background: linear-gradient(135deg, #fbbf24, #fcd34d) !important;
+    box-shadow: 0 4px 15px rgba(251,191,36,0.5) !important;
+    transform: translateY(-1px) !important;
 }
 
 /* ── SELECTBOX / DROPDOWNS ── */
@@ -522,7 +539,7 @@ h1, h2, h3, h4, h5, label, .stTextInput input, .stTextArea textarea {
 .t-spacer { flex: 1; }
 .t-plan {
     display: flex; align-items: center; gap: 6px;
-    background: linear-gradient(135deg, #0077b6, #00c2ff);
+    background: linear-gradient(135deg, #d97706, #fbbf24);
     color: #000; font-size: 13px; font-weight: 700;
     padding: 6px 16px; border-radius: 20px;
     cursor: pointer; transition: all 0.2s;
@@ -667,20 +684,6 @@ if "current_chat" not in st.session_state:
 # ---------- NAV STATE ----------
 # The HTML sidebar icons above route by query parameter (?page=...).
 # Model selector pinned to header area
-model_choice = st.selectbox("Model", ["Auto", "Llama", "Gemini"], index=1, label_visibility="collapsed",
-                             key="model_select")
-st.markdown(
-    f"""
-    <div class="chat-inline-control chat-inline-folder" title="Upload files">&#128193;</div>
-    <div class="chat-inline-control chat-inline-model" title="Switch model">
-      <strong>{model_choice}</strong><span>▾</span>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ---------- PAGE ROUTING ----------
-page = st.session_state.page
 
 # =========================================
 # 💬 CHAT PAGE
@@ -782,6 +785,18 @@ if page == "Chat":
                     else:
                         st.info("No retrieved context was used.")
     st.markdown('<div class="chat-bottom-spacer"></div>', unsafe_allow_html=True)
+    
+    # Folder and model controls (Chat page only)
+    st.markdown(
+        f"""
+        <div class="chat-inline-control chat-inline-folder" title="Upload files">&#128193;</div>
+        <div class="chat-inline-control chat-inline-model" title="Switch model">
+          <strong>{model_choice}</strong><span>&#9662;</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    
     # ---------- INPUT ----------
     user_input = st.chat_input("Ask anything...", key="main_chat")
 
@@ -857,7 +872,8 @@ elif page == "Search":
         with st.spinner("Searching..."):
             response = answer_query(
                 f"Give a clear, structured answer with points for: {query}",
-                model_choice
+                model_choice,
+                use_rag=True  # Enable RAG for search
             )
 
         st.write(response)
