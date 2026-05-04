@@ -696,22 +696,9 @@ if page == "Chat":
 
     chat_history = st.session_state.chats[st.session_state.current_chat]
 
-    with st.expander("Chat settings", expanded=False):
-        temperature = st.slider(
-            "Temperature",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.2,
-            step=0.1,
-            key="temperature_control",
-            help="Lower values are more focused; higher values are more creative.",
-        )
-        show_context = st.toggle(
-            "Show context",
-            value=False,
-            key="show_context_control",
-            help="Show retrieved context sources and trace details under each assistant answer.",
-        )
+    # Default values (Chat settings UI removed)
+    temperature = 0.2
+    show_context = False
 
     # ---------- FILE UPLOAD — embedded in bottom bar as 📎 icon ----------
     uploaded_file = st.file_uploader(
