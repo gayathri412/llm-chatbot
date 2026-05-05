@@ -1,5 +1,7 @@
 import sys
 import os
+import requests
+import urllib.parse
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import streamlit as st
@@ -82,65 +84,45 @@ page = st.session_state.page
 # 🏠 HOME PAGE
 # =========================================
 if page == "Home":
+    # Logo centered
     st.markdown("""
-    <div style='text-align:center; margin-top:100px;'>
-        <h1 style='font-size:50px; color:#fbbf24;'>🤖 SNTI AI</h1>
-        <p style='font-size:20px; color:#888; margin-top:20px;'>Your Intelligent Assistant for Everything</p>
+    <div style='text-align:center; margin-top:80px; margin-bottom:40px;'>
+        <h1 style='font-size:56px; color:#fbbf24; font-weight:600; letter-spacing:2px;'>SNTI AI</h1>
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("---")
+    # Centered chat input bar with all controls
+    col_spacer1, col_main, col_spacer2 = st.columns([1, 3, 1])
     
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("""
-        ### 💬 Chat
-        Have intelligent conversations with AI
-        """)
-        if st.button("Start Chatting", key="home_chat"):
-            st.session_state.page = "Chat"
-            st.rerun()
-    
-    with col2:
-        st.markdown("""
-        ### 📊 Charts
-        Analyze data with AI-powered insights
-        """)
-        if st.button("Analyze Data", key="home_charts"):
-            st.session_state.page = "Charts"
-            st.rerun()
-    
-    with col3:
-        st.markdown("""
-        ### 🖼️ Images
-        Generate AI images with Pollinations
-        """)
-        if st.button("Create Images", key="home_images"):
-            st.session_state.page = "Images"
-            st.rerun()
-    
-    st.markdown("---")
-    
-    # Quick stats or recent activity
-    st.markdown("### 🚀 Quick Access")
-    
-    col4, col5, col6, col7 = st.columns(4)
-    with col4:
-        if st.button("🔍 Search", use_container_width=True):
-            st.session_state.page = "Search"
-            st.rerun()
-    with col5:
-        if st.button("📱 AI Tools", use_container_width=True):
-            st.session_state.page = "Apps"
-            st.rerun()
-    with col6:
-        if st.button("🧠 Research", use_container_width=True):
-            st.session_state.page = "Research"
-            st.rerun()
-    with col7:
-        if st.button("💻 Codex", use_container_width=True):
-            st.session_state.page = "Codex"
-            st.rerun()
+    with col_main:
+        # File upload (+ button)
+        uploaded_file = st.file_uploader("+", type=["pdf", "csv", "txt", "png", "jpg", "jpeg"], 
+                                          label_visibility="collapsed", key="home_file_upload")
+        if uploaded_file:
+            st.session_state.uploaded_file = uploaded_file
+            st.success(f"📎 {uploaded_file.name} ready")
+        
+        # Model selection
+        model = st.selectbox("Model", ["GPT-4", "GPT-3.5", "Claude", "Llama"], 
+                            label_visibility="collapsed", key="home_model")
+        
+        # Chat input with voice button
+        col_input, col_voice = st.columns([5, 1])
+        with col_input:
+            user_input = st.text_input("Ask anything...", label_visibility="collapsed", 
+                                       placeholder="Ask anything...", key="home_chat_input")
+        with col_voice:
+            if st.button("🎤", help="Voice input (coming soon)", key="home_voice"):
+                st.info("Voice input feature coming soon!")
+        
+        # Enter button
+        if st.button("➤ Enter", use_container_width=True, key="home_enter"):
+            if user_input.strip():
+                st.session_state.user_input = user_input
+                st.session_state.page = "Chat"
+                st.rerun()
+            else:
+                st.warning("Please enter a message")
 
 # =========================================
 # 💬 CHAT PAGE
