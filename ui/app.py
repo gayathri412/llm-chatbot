@@ -40,7 +40,7 @@ st.markdown("""
 
 # Session state
 if "page" not in st.session_state:
-    st.session_state.page = "Chat"
+    st.session_state.page = "Home"
 if "chats" not in st.session_state:
     st.session_state.chats = {"Chat 1": []}
 if "current_chat" not in st.session_state:
@@ -50,6 +50,7 @@ if "current_chat" not in st.session_state:
 st.sidebar.title("💬 SNTI")
 
 nav_buttons = [
+    ("🏠 Home", "Home"),
     ("➕ New Chat", "NewChat"),
     ("🔍 Search", "Search"),
     ("📊 Charts", "Charts"),
@@ -78,7 +79,74 @@ model_choice = st.sidebar.selectbox("Model", ["Llama", "Gemini"])
 # Page routing
 page = st.session_state.page
 
-if page == "Chat":
+# =========================================
+# 🏠 HOME PAGE
+# =========================================
+if page == "Home":
+    st.markdown("""
+    <div style='text-align:center; margin-top:100px;'>
+        <h1 style='font-size:50px; color:#fbbf24;'>🤖 SNTI AI</h1>
+        <p style='font-size:20px; color:#888; margin-top:20px;'>Your Intelligent Assistant for Everything</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("""
+        ### 💬 Chat
+        Have intelligent conversations with AI
+        """)
+        if st.button("Start Chatting", key="home_chat"):
+            st.session_state.page = "Chat"
+            st.rerun()
+    
+    with col2:
+        st.markdown("""
+        ### 📊 Charts
+        Analyze data with AI-powered insights
+        """)
+        if st.button("Analyze Data", key="home_charts"):
+            st.session_state.page = "Charts"
+            st.rerun()
+    
+    with col3:
+        st.markdown("""
+        ### 🖼️ Images
+        Generate AI images with Pollinations
+        """)
+        if st.button("Create Images", key="home_images"):
+            st.session_state.page = "Images"
+            st.rerun()
+    
+    st.markdown("---")
+    
+    # Quick stats or recent activity
+    st.markdown("### 🚀 Quick Access")
+    
+    col4, col5, col6, col7 = st.columns(4)
+    with col4:
+        if st.button("🔍 Search", use_container_width=True):
+            st.session_state.page = "Search"
+            st.rerun()
+    with col5:
+        if st.button("📱 AI Tools", use_container_width=True):
+            st.session_state.page = "Apps"
+            st.rerun()
+    with col6:
+        if st.button("🧠 Research", use_container_width=True):
+            st.session_state.page = "Research"
+            st.rerun()
+    with col7:
+        if st.button("💻 Codex", use_container_width=True):
+            st.session_state.page = "Codex"
+            st.rerun()
+
+# =========================================
+# 💬 CHAT PAGE
+# =========================================
+elif page == "Chat":
     chat_history = st.session_state.chats[st.session_state.current_chat]
     if not chat_history:
         st.markdown(f"<h1 style='text-align:center;margin-top:150px;color:#fbbf24'>🤖 {model_choice}</h1>", unsafe_allow_html=True)
@@ -103,7 +171,7 @@ elif page == "Search":
 
 elif page == "Charts":
     st.title("📊 AI Data Analytics + Prediction")
-
+    
     import pandas as pd
     import numpy as np
     import matplotlib.pyplot as plt
@@ -113,11 +181,76 @@ elif page == "Charts":
 
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet
-
-    file = st.file_uploader(
-        "📂 Upload CSV or PDF",
-        type=["csv", "pdf"]
-    )
+    
+    # ---------- DATA SOURCE SELECTION ----------
+    data_source = st.selectbox("📡 Select Data Source", ["Upload File", "BigQuery"])
+    
+    df = None
+    
+    if data_source == "BigQuery":
+        st.markdown("### 🔗 BigQuery Connection")
+        bq_project = st.text_input("Project ID", placeholder="my-project-123")
+        bq_dataset = st.text_input("Dataset", placeholder="my_dataset")
+        bq_table = st.text_input("Table", placeholder="my_table")
+        
+        if st.button("Connect to BigQuery"):
+            with st.spinner("Connecting to BigQuery..."):
+                try:
+                    from google.cloud import bigquery
+                    client = bigquery.Client(project=bq_project)
+                    query = f"SELECT * FROM `{bq_project}.{bq_dataset}.{bq_table}` LIMIT 1000"
+                    df = client.query(query).to_dataframe()
+                    st.success(f"✅ Connected! Loaded {len(df)} rows")
+                    st.dataframe(df.head())
+                except Exception as e:
+                    st.error(f"❌ BigQuery connection failed: {e}")
+                    st.info("💡 Note: BigQuery requires `google-cloud-bigquery` library and authentication setup")
+    
+    else:
+        file = st.file_uploader("📂 Upload CSV or PDF", type=["csv", "pdf"])
+        
+        if file:
+            st.success(f"Uploaded: {file.name}")
+            if file.name.endswith(".csv"):
+                df = pd.read_csv(file)
+                df = df.loc[:, ~df.columns.duplicated()]
+            elif file.name.endswith(".pdf"):
+                with pdfplumber.open(file) as pdf:
+                    text = ""
+                    for page in pdf.pages:
+                        text += page.extract_text() or ""
+                st.text_area("PDF Content", text[:2000])
+    
+    # ---------- SAMPLE VISUALIZATIONS (Show when no data) ----------
+    if df is None:
+        st.markdown("---")
+        st.markdown("### 📈 Sample Analytics Dashboard")
+        
+        # Create sample data
+        sample_data = pd.DataFrame({
+            'Month': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            'Sales': [120, 135, 148, 162, 175, 190],
+            'Revenue': [12000, 13500, 14800, 16200, 17500, 19000],
+            'Users': [850, 920, 1050, 1180, 1320, 1450]
+        })
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 📊 Sales Trend")
+            st.line_chart(sample_data.set_index('Month')[['Sales', 'Revenue']])
+        
+        with col2:
+            st.markdown("#### 👥 User Growth")
+            st.bar_chart(sample_data.set_index('Month')['Users'])
+        
+        st.markdown("---")
+        st.markdown("### 📤 Upload Your Data")
+        st.info("👆 Upload a CSV or PDF file above to analyze your own data with AI-powered insights!")
+        
+    else:
+        # Data Analysis Section
+        styles = getSampleStyleSheet()
 
     if file:
         st.success(f"Uploaded: {file.name}")
@@ -322,10 +455,59 @@ elif page == "BigData":
 
 elif page == "Images":
     st.title("🖼️ Image AI Studio")
-    st.info("Images page - AI image generation and editing (Photo code preserved)")
+    
+    # ---------- POLLINATIONS AI IMAGE GENERATION ----------
+    st.markdown("### 🤖 AI Image Generation (Pollinations)")
+    
+    img_prompt = st.text_area("Describe the image you want to generate...", 
+                               placeholder="A futuristic city with flying cars, cyberpunk style, neon lights...")
+    
+    col_img1, col_img2, col_img3 = st.columns([1, 1, 2])
+    with col_img1:
+        img_width = st.selectbox("Width", [1024, 512, 768], index=0)
+    with col_img2:
+        img_height = st.selectbox("Height", [1024, 512, 768], index=0)
+    with col_img3:
+        img_seed = st.number_input("Seed (0 for random)", min_value=0, max_value=999999, value=0)
+    
+    if st.button("🎨 Generate Image", type="primary"):
+        if img_prompt.strip():
+            with st.spinner("Generating image with Pollinations AI..."):
+                try:
+                    # Pollinations AI API
+                    seed = img_seed if img_seed > 0 else None
+                    encoded_prompt = requests.utils.quote(img_prompt)
+                    img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={img_width}&height={img_height}&nologo=true"
+                    if seed:
+                        img_url += f"&seed={seed}"
+                    
+                    # Display generated image
+                    st.image(img_url, caption=f"Generated: {img_prompt[:50]}...", use_column_width=True)
+                    
+                    # Download button
+                    response = requests.get(img_url, timeout=60)
+                    if response.status_code == 200:
+                        st.download_button(
+                            "📥 Download Image",
+                            response.content,
+                            f"generated_{img_seed or 'random'}.png",
+                            "image/png"
+                        )
+                except Exception as e:
+                    st.error(f"Error generating image: {str(e)}")
+        else:
+            st.warning("Please enter a description for the image.")
+    
+    st.markdown("---")
+    st.info("💡 Tip: Use detailed prompts for better results. Example: 'A serene Japanese garden with cherry blossoms, golden hour lighting, 8k quality'")
 
 elif page == "Apps":
     st.title("📱 AI Tools Hub")
+    
+    # ---------- SEARCH BAR ----------
+    search_query = st.text_input("🔍 Search tools...", placeholder="Type to filter apps...")
+    
+    st.markdown("---")
 
     import pandas as pd
     import numpy as np
@@ -333,13 +515,24 @@ elif page == "Apps":
     import re
 
     # ---------- SELECT APP ----------
-    app = st.selectbox("Choose App", [
+    all_apps = [
         "📄 PDF Analyzer",
         "📊 CSV Analyzer",
         "🧾 Resume Analyzer",
         "🔐 Password Tester",
         "💬 Writing Assistant"
-    ])
+    ]
+    
+    # Filter apps based on search
+    if search_query:
+        filtered_apps = [app for app in all_apps if search_query.lower() in app.lower()]
+        if not filtered_apps:
+            st.info("No tools found matching your search.")
+            filtered_apps = all_apps
+    else:
+        filtered_apps = all_apps
+    
+    app = st.selectbox("Choose App", filtered_apps)
 
     # =========================================================
     # 📄 PDF ANALYZER
@@ -399,46 +592,97 @@ elif page == "Apps":
     # 🔐 PASSWORD TESTER
     # =========================================================
     elif app == "🔐 Password Tester":
-        password = st.text_input("Enter Password", type="password")
+        st.markdown("### 🔐 Password Strength Tester")
+        st.markdown("Enter a password to check its strength.")
+        
+        password = st.text_input("Enter Password", type="password", key="pwd_input")
 
         def check_strength(p):
             score = 0
+            feedback = []
+            
             if len(p) >= 8:
                 score += 1
+            else:
+                feedback.append("❌ At least 8 characters")
+                
             if re.search(r"[A-Z]", p):
                 score += 1
+            else:
+                feedback.append("❌ At least one uppercase letter")
+                
             if re.search(r"[0-9]", p):
                 score += 1
-            if re.search(r"[!@#$%^&*]", p):
+            else:
+                feedback.append("❌ At least one number")
+                
+            if re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", p):
                 score += 1
-            return score
+            else:
+                feedback.append("❌ At least one special character")
+                
+            return score, feedback
 
         if password:
-            score = check_strength(password)
-
+            score, feedback = check_strength(password)
+            
+            # Progress bar
+            st.progress(score / 4)
+            
             if score <= 1:
-                st.error("Weak Password")
+                st.error(f"🔴 Weak Password ({score}/4)")
+                st.markdown("**Requirements to improve:**")
+                for item in feedback:
+                    st.markdown(f"- {item}")
             elif score == 2:
-                st.warning("Moderate Password")
+                st.warning(f"🟡 Moderate Password ({score}/4)")
+                st.markdown("**Requirements to improve:**")
+                for item in feedback:
+                    st.markdown(f"- {item}")
             else:
-                st.success("Strong Password")
+                st.success(f"🟢 Strong Password ({score}/4) ✅")
+                st.markdown("Great! Your password meets all security requirements.")
 
     # =========================================================
     # 💬 WRITING ASSISTANT
     # =========================================================
     elif app == "💬 Writing Assistant":
-        text = st.text_area("Enter Text")
+        text = st.text_area("Enter Text", height=150)
 
         action = st.selectbox("Choose Action", [
             "Rewrite",
             "Summarize",
             "Fix Grammar"
         ])
+        
+        # Detailed prompts for each action
+        action_prompts = {
+            "Rewrite": """Rewrite the following text to improve clarity, flow, and readability while maintaining the original meaning. 
+            Use varied vocabulary, better sentence structures, and a professional tone:
+            
+            {text}""",
+            
+            "Summarize": """Provide a concise summary of the following text. 
+            Capture the main points and key ideas in 2-3 short paragraphs or bullet points:
+            
+            {text}""",
+            
+            "Fix Grammar": """Correct all grammar, spelling, punctuation, and style issues in the following text. 
+            Provide the corrected version with brief explanations of major changes made:
+            
+            {text}"""
+        }
 
-        if st.button("Process"):
-            prompt = f"{action} this text:\n{text}"
-            result = answer_query(prompt, model_choice)
-            st.write(result)
+        if st.button("Process", type="primary"):
+            if text.strip():
+                with st.spinner(f"Processing with {action}..."):
+                    prompt = action_prompts[action].format(text=text)
+                    result = answer_query(prompt, model_choice)
+                
+                st.markdown("### ✨ Result:")
+                st.write(result)
+            else:
+                st.warning("⚠️ Please enter some text to process.")
 
 elif page == "Research":
     st.title("🧠 AI Research Assistant")
