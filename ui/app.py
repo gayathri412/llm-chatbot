@@ -259,79 +259,91 @@ elif page == "Charts":
 
         # ================= CSV =================
         if file.name.endswith(".csv"):
-            df = pd.read_csv(file)
-            df = df.loc[:, ~df.columns.duplicated()]
+            try:
+                df = pd.read_csv(file)
+                if df.empty:
+                    st.warning("⚠️ The CSV file is empty. Please upload a file with data.")
+                    df = None
+                else:
+                    df = df.loc[:, ~df.columns.duplicated()]
+            except pd.errors.EmptyDataError:
+                st.error("❌ The CSV file is empty. Please upload a file with data.")
+                df = None
+            except Exception as e:
+                st.error(f"❌ Error reading CSV: {e}")
+                df = None
 
-            st.write("### 📄 Data Preview")
-            st.dataframe(df.head())
+            if df is not None:
+                st.write("### 📄 Data Preview")
+                st.dataframe(df.head())
 
-            # --------- EXPLAIN ----------
-            st.write("### 🤖 Data Explanation")
-            summary = df.describe(include='all').to_string()
+                # --------- EXPLAIN ----------
+                st.write("### 🤖 Data Explanation")
+                summary = df.describe(include='all').to_string()
 
-            explanation = answer_query(
-                f"Explain this dataset:\n{summary}",
-                model_choice
-            )
-            st.write(explanation)
+                explanation = answer_query(
+                    f"Explain this dataset:\n{summary}",
+                    model_choice
+                )
+                st.write(explanation)
 
-            # --------- SELECT ----------
-            cols = df.columns.tolist()
-            x_col = st.selectbox("X-axis", cols)
-            y_col = st.selectbox("Y-axis", cols)
+                # --------- SELECT ----------
+                cols = df.columns.tolist()
+                x_col = st.selectbox("X-axis", cols)
+                y_col = st.selectbox("Y-axis", cols)
 
-            if x_col != y_col:
-                df[y_col] = pd.to_numeric(df[y_col], errors='coerce')
-                chart_data = df[[x_col, y_col]].dropna()
+                if x_col != y_col:
+                    df[y_col] = pd.to_numeric(df[y_col], errors='coerce')
+                    chart_data = df[[x_col, y_col]].dropna()
 
-                if not chart_data.empty:
-                    st.write("### 📊 Visualization")
+                    if not chart_data.empty:
+                        st.write("### 📊 Visualization")
 
-                    chart_type = st.selectbox(
-                        "Chart Type",
-                        ["Line", "Bar", "Scatter"]
-                    )
+                        chart_type = st.selectbox(
+                            "Chart Type",
+                            ["Line", "Bar", "Scatter"]
+                        )
 
-                    if chart_type == "Line":
-                        st.line_chart(chart_data, x=x_col, y=y_col)
+                        if chart_type == "Line":
+                            st.line_chart(chart_data, x=x_col, y=y_col)
 
-                    elif chart_type == "Bar":
-                        st.bar_chart(chart_data, x=x_col, y=y_col)
+                        elif chart_type == "Bar":
+                            st.bar_chart(chart_data, x=x_col, y=y_col)
 
-                    elif chart_type == "Scatter":
-                        fig, ax = plt.subplots()
-                        ax.scatter(chart_data[x_col], chart_data[y_col])
-                        st.pyplot(fig)
+                        elif chart_type == "Scatter":
+                            fig, ax = plt.subplots()
+                            ax.scatter(chart_data[x_col], chart_data[y_col])
+                            st.pyplot(fig)
 
-                    # --------- ANALYSIS ----------
-                    st.write("### 📊 Analysis")
+                        # --------- ANALYSIS ----------
+                        st.write("### 📊 Analysis")
 
-                    analysis = answer_query(
-                        f"Analyze trends:\n{summary}",
-                        model_choice
-                    )
-                    st.write(analysis)
+                        analysis = answer_query(
+                            f"Analyze trends:\n{summary}",
+                            model_choice
+                        )
+                        st.write(analysis)
 
-                    # --------- PREDICTION ----------
-                    st.write("### 🔮 Prediction")
+                        # --------- PREDICTION ----------
+                        st.write("### 🔮 Prediction")
 
-                    X = np.arange(len(chart_data)).reshape(-1, 1)
-                    y = chart_data[y_col].values
+                        X = np.arange(len(chart_data)).reshape(-1, 1)
+                        y = chart_data[y_col].values
 
-                    model = LinearRegression()
-                    model.fit(X, y)
+                        model = LinearRegression()
+                        model.fit(X, y)
 
-                    future = np.arange(len(X), len(X)+5).reshape(-1, 1)
-                    pred = model.predict(future)
+                        future = np.arange(len(X), len(X)+5).reshape(-1, 1)
+                        pred = model.predict(future)
 
-                    st.write(pred)
+                        st.write(pred)
 
-                    pred_df = pd.DataFrame({
-                        "Index": list(range(len(y) + len(pred))),
-                        "Value": np.concatenate([y, pred])
-                    })
+                        pred_df = pd.DataFrame({
+                            "Index": list(range(len(y) + len(pred))),
+                            "Value": np.concatenate([y, pred])
+                        })
 
-                    st.line_chart(pred_df, x="Index", y="Value")
+                        st.line_chart(pred_df, x="Index", y="Value")
 
                     # --------- PDF DOWNLOAD ----------
                     report = f"""
