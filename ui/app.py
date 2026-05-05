@@ -54,8 +54,7 @@ nav_buttons = [
     ("➕ New Chat", "NewChat"),
     ("🔍 Search", "Search"),
     ("📊 Charts", "Charts"),
-    ("🗄️ Big Data", "BigData"),
-    ("🖼️ Images", "Images"),
+    ("️ Images", "Images"),
     ("📱 Apps", "Apps"),
     ("🧠 Research", "Research"),
     ("💻 Codex", "Codex"),
@@ -277,7 +276,38 @@ elif page == "Charts":
                 st.write("### 📄 Data Preview")
                 st.dataframe(df.head())
 
+                # --------- AUTO VISUALIZATIONS FROM DATA ----------
+                st.markdown("---")
+                st.write("### 📊 Auto-Generated Visualizations")
+                
+                # Find numeric columns for visualization
+                numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+                categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+                
+                viz_col1, viz_col2 = st.columns(2)
+                
+                with viz_col1:
+                    if len(numeric_cols) >= 2:
+                        st.markdown(f"#### 📈 {numeric_cols[0]} vs {numeric_cols[1]}")
+                        chart_df = df[[numeric_cols[0], numeric_cols[1]]].dropna()
+                        if not chart_df.empty:
+                            st.line_chart(chart_df)
+                    elif len(numeric_cols) >= 1 and len(categorical_cols) >= 1:
+                        st.markdown(f"#### 📈 {categorical_cols[0]} vs {numeric_cols[0]}")
+                        chart_df = df[[categorical_cols[0], numeric_cols[0]]].dropna().head(20)
+                        if not chart_df.empty:
+                            st.bar_chart(chart_df.set_index(categorical_cols[0]))
+                
+                with viz_col2:
+                    if len(numeric_cols) >= 3:
+                        st.markdown(f"#### 📊 {numeric_cols[2]} Distribution")
+                        st.bar_chart(df[numeric_cols[2]].head(20))
+                    elif len(numeric_cols) >= 1:
+                        st.markdown(f"#### 📊 {numeric_cols[0]} Trend")
+                        st.line_chart(df[numeric_cols[0]].head(50))
+
                 # --------- EXPLAIN ----------
+                st.markdown("---")
                 st.write("### 🤖 Data Explanation")
                 summary = df.describe(include='all').to_string()
 
@@ -287,17 +317,23 @@ elif page == "Charts":
                 )
                 st.write(explanation)
 
-                # --------- SELECT ----------
+                # --------- CUSTOM ANALYSIS ----------
+                st.markdown("---")
+                st.write("### 🔍 Custom Analysis")
+                
                 cols = df.columns.tolist()
-                x_col = st.selectbox("X-axis", cols)
-                y_col = st.selectbox("Y-axis", cols)
+                col1, col2 = st.columns(2)
+                with col1:
+                    x_col = st.selectbox("X-axis", cols, key="x_custom")
+                with col2:
+                    y_col = st.selectbox("Y-axis", cols, key="y_custom")
 
                 if x_col != y_col:
                     df[y_col] = pd.to_numeric(df[y_col], errors='coerce')
                     chart_data = df[[x_col, y_col]].dropna()
 
                     if not chart_data.empty:
-                        st.write("### 📊 Visualization")
+                        st.write("### 📊 Custom Visualization")
 
                         chart_type = st.selectbox(
                             "Chart Type",
@@ -316,10 +352,10 @@ elif page == "Charts":
                             st.pyplot(fig)
 
                         # --------- ANALYSIS ----------
-                        st.write("### 📊 Analysis")
+                        st.write("### 📊 AI Analysis")
 
                         analysis = answer_query(
-                            f"Analyze trends:\n{summary}",
+                            f"Analyze trends between {x_col} and {y_col}:\n{chart_data.describe().to_string()}",
                             model_choice
                         )
                         st.write(analysis)
@@ -336,6 +372,7 @@ elif page == "Charts":
                         future = np.arange(len(X), len(X)+5).reshape(-1, 1)
                         pred = model.predict(future)
 
+                        st.write(f"Next 5 predicted values for {y_col}:")
                         st.write(pred)
 
                         pred_df = pd.DataFrame({
@@ -454,16 +491,6 @@ elif page == "Charts":
             )
 
             st.write(reply)
-
-elif page == "BigData":
-    st.title("🗄️ Big Data Query & Analytics")
-    st.info("Big Data page - Connect to BigQuery and analyze large datasets")
-    
-    st.write("### Features:")
-    st.write("- Connect to BigQuery")
-    st.write("- Run SQL queries")
-    st.write("- Analyze large datasets")
-    st.write("- Export results")
 
 elif page == "Images":
     st.title("🖼️ Image AI Studio")
