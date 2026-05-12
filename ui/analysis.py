@@ -46,11 +46,40 @@ def render_charts_page(model_choice, answer_query):
     st.success(f"Uploaded: {file.name}")
 
     if file.name.endswith(".csv"):
-        df = pd.read_csv(file)
-        df = df.loc[:, ~df.columns.duplicated()]
+        try:
+            # Try different encodings
+            encodings = ['utf-8', 'latin1', 'cp1252', 'iso-8859-1']
+            df = None
+            for encoding in encodings:
+                try:
+                    df = pd.read_csv(file, encoding=encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if df is None:
+                st.error("Could not read the CSV file. Please check the file format.")
+                return
+            
+            # Remove empty columns and rows
+            df = df.dropna(axis=1, how='all')  # Drop empty columns
+            df = df.dropna(axis=0, how='all')  # Drop empty rows
+            df = df.loc[:, ~df.columns.duplicated()]  # Remove duplicate columns
 
-        st.write("### Data Preview")
-        st.dataframe(df.head())
+            if df.empty:
+                st.error("The CSV file appears to be empty or contains no valid data.")
+                return
+
+            st.write("### Data Preview")
+            st.dataframe(df.head())
+            
+            st.write(f"### Dataset Info")
+            st.write(f"Shape: {df.shape[0]} rows, {df.shape[1]} columns")
+            st.write(f"Columns: {list(df.columns)}")
+            
+        except Exception as e:
+            st.error(f"Error reading CSV file: {str(e)}")
+            return
 
         st.write("### Data Explanation")
         summary = df.describe(include="all").to_string()
