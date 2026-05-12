@@ -31,8 +31,8 @@ def _build_pdf_report(title, report_text):
 def render_charts_page(model_choice, answer_query):
     st.title("📊 AI Data Analytics + Prediction")
     file = st.file_uploader(
-        "📂 Upload CSV or PDF",
-        type=["csv", "pdf"]
+        "📂 Upload CSV, Excel, or PDF",
+        type=["csv", "xlsx", "xls", "pdf"]
     )
 
     question = st.text_input(
@@ -45,43 +45,73 @@ def render_charts_page(model_choice, answer_query):
 
     st.success(f"Uploaded: {file.name}")
 
-    if file.name.endswith(".csv"):
+    if file.name.endswith((".csv", ".xlsx", ".xls")):
         try:
             # Reset file pointer to beginning
             file.seek(0)
             
             # Read raw content first to debug
-            raw_content = file.read(1000)  # Read first 1000 bytes
+            raw_content = file.read(2000)  # Read first 2000 bytes
             st.write("### Debug: File Content Preview")
             st.code(raw_content.decode('utf-8', errors='replace'))
             
             # Reset file pointer again for pandas
             file.seek(0)
             
-            # Try different encodings
+            # Try different delimiters and encodings
+            delimiters = [',', ';', '\t', '|']
             encodings = ['utf-8', 'latin1', 'cp1252', 'iso-8859-1']
             df = None
             last_error = None
+            success_info = {}
             
             for encoding in encodings:
-                try:
-                    file.seek(0)  # Reset for each attempt
-                    df = pd.read_csv(file, encoding=encoding)
-                    st.success(f"Successfully read with encoding: {encoding}")
+                for delimiter in delimiters:
+                    try:
+                        file.seek(0)  # Reset for each attempt
+                        df = pd.read_csv(file, encoding=encoding, delimiter=delimiter)
+                        success_info = {
+                            'encoding': encoding,
+                            'delimiter': delimiter,
+                            'shape': df.shape,
+                            'columns': list(df.columns)
+                        }
+                        st.success(f"Successfully read with {encoding} encoding and '{delimiter}' delimiter")
+                        break
+                    except Exception as e:
+                        last_error = e
+                        continue
+                if df is not None:
                     break
+            
+            # If still None, try Excel reading (for CSV files that are actually Excel)
+            if df is None:
+                try:
+                    file.seek(0)
+                    import io
+                    excel_data = file.read()
+                    file.seek(0)
+                    df = pd.read_excel(io.BytesIO(excel_data))
+                    success_info = {
+                        'format': 'Excel',
+                        'shape': df.shape,
+                        'columns': list(df.columns)
+                    }
+                    st.success("Successfully read as Excel file (even though it has .csv extension)")
                 except Exception as e:
                     last_error = e
-                    continue
             
             if df is None:
-                st.error(f"Could not read the CSV file. Last error: {last_error}")
+                st.error(f"Could not read the file. Tried multiple formats. Last error: {last_error}")
+                st.write("Please save the file as CSV (Comma delimited) from Excel")
                 return
             
             # Debug info
             st.write("### Debug: DataFrame Info")
+            st.write(f"Success info: {success_info}")
             st.write(f"DataFrame shape: {df.shape}")
             st.write(f"DataFrame columns: {list(df.columns)}")
-            st.write(f"DataFrame dtypes: {df.dtypes.to_dict()}")
+            st.write(f"First few rows:\n{df.head(3).to_string()}")
             
             # Remove empty columns and rows
             original_shape = df.shape
@@ -94,7 +124,7 @@ def render_charts_page(model_choice, answer_query):
             st.write(f"Cleaned shape: {df.shape}")
 
             if df.empty:
-                st.error("The CSV file appears to be empty after cleaning. Check if all rows/columns are empty.")
+                st.error("The file appears to be empty after cleaning. Check if all rows/columns are empty.")
                 return
 
             st.write("### Data Preview")
@@ -105,7 +135,7 @@ def render_charts_page(model_choice, answer_query):
             st.write(f"Columns: {list(df.columns)}")
             
         except Exception as e:
-            st.error(f"Error reading CSV file: {str(e)}")
+            st.error(f"Error reading file: {str(e)}")
             import traceback
             st.error(f"Full error: {traceback.format_exc()}")
             return
