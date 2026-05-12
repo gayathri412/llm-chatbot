@@ -51,9 +51,26 @@ def render_charts_page(model_choice, answer_query):
             file.seek(0)
             
             # Read raw content first to debug
-            raw_content = file.read(2000)  # Read first 2000 bytes
-            st.write("### Debug: File Content Preview")
-            st.code(raw_content.decode('utf-8', errors='replace'))
+            file.seek(0)
+            raw_bytes = file.read(2000)  # Read first 2000 bytes
+            st.write("### Debug: Raw File Content (first 2000 bytes)")
+            st.code(raw_bytes)
+            
+            # Try to decode as text
+            try:
+                raw_text = raw_bytes.decode('utf-8', errors='replace')
+                st.write("### Debug: Decoded Text Content")
+                st.code(raw_text)
+            except:
+                st.error("Could not decode file content as text")
+            
+            # Show file info
+            st.write("### Debug: File Information")
+            st.write(f"File size: {len(file.getvalue())} bytes")
+            st.write(f"File name: {file.name}")
+            st.write(f"File type: {file.type}")
+            
+            file.seek(0)
             
             # Reset file pointer again for pandas
             file.seek(0)
