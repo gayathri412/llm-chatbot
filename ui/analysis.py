@@ -47,27 +47,54 @@ def render_charts_page(model_choice, answer_query):
 
     if file.name.endswith(".csv"):
         try:
+            # Reset file pointer to beginning
+            file.seek(0)
+            
+            # Read raw content first to debug
+            raw_content = file.read(1000)  # Read first 1000 bytes
+            st.write("### Debug: File Content Preview")
+            st.code(raw_content.decode('utf-8', errors='replace'))
+            
+            # Reset file pointer again for pandas
+            file.seek(0)
+            
             # Try different encodings
             encodings = ['utf-8', 'latin1', 'cp1252', 'iso-8859-1']
             df = None
+            last_error = None
+            
             for encoding in encodings:
                 try:
+                    file.seek(0)  # Reset for each attempt
                     df = pd.read_csv(file, encoding=encoding)
+                    st.success(f"Successfully read with encoding: {encoding}")
                     break
-                except UnicodeDecodeError:
+                except Exception as e:
+                    last_error = e
                     continue
             
             if df is None:
-                st.error("Could not read the CSV file. Please check the file format.")
+                st.error(f"Could not read the CSV file. Last error: {last_error}")
                 return
             
+            # Debug info
+            st.write("### Debug: DataFrame Info")
+            st.write(f"DataFrame shape: {df.shape}")
+            st.write(f"DataFrame columns: {list(df.columns)}")
+            st.write(f"DataFrame dtypes: {df.dtypes.to_dict()}")
+            
             # Remove empty columns and rows
+            original_shape = df.shape
             df = df.dropna(axis=1, how='all')  # Drop empty columns
             df = df.dropna(axis=0, how='all')  # Drop empty rows
             df = df.loc[:, ~df.columns.duplicated()]  # Remove duplicate columns
+            
+            st.write(f"### Debug: After Cleaning")
+            st.write(f"Original shape: {original_shape}")
+            st.write(f"Cleaned shape: {df.shape}")
 
             if df.empty:
-                st.error("The CSV file appears to be empty or contains no valid data.")
+                st.error("The CSV file appears to be empty after cleaning. Check if all rows/columns are empty.")
                 return
 
             st.write("### Data Preview")
@@ -79,6 +106,8 @@ def render_charts_page(model_choice, answer_query):
             
         except Exception as e:
             st.error(f"Error reading CSV file: {str(e)}")
+            import traceback
+            st.error(f"Full error: {traceback.format_exc()}")
             return
 
         st.write("### Data Explanation")
