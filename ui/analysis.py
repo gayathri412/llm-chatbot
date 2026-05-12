@@ -149,64 +149,119 @@ def render_charts_page(model_choice, answer_query):
         )
         st.write(explanation)
 
-        cols = df.columns.tolist()
-        x_col = st.selectbox("X-axis", cols)
-        y_col = st.selectbox("Y-axis", cols)
-
-        if x_col != y_col:
-            df[y_col] = pd.to_numeric(df[y_col], errors="coerce")
-            chart_data = df[[x_col, y_col]].dropna()
-
-            if not chart_data.empty:
-                st.write("### Visualization")
-
-                chart_type = st.selectbox(
-                    "Chart Type",
-                    ["Line", "Bar", "Scatter"],
-                )
-
-                if chart_type == "Line":
-                    st.line_chart(chart_data, x=x_col, y=y_col)
-
-                elif chart_type == "Bar":
-                    st.bar_chart(chart_data, x=x_col, y=y_col)
-
-                elif chart_type == "Scatter":
-                    fig, ax = plt.subplots()
-                    ax.scatter(chart_data[x_col], chart_data[y_col])
-                    ax.set_xlabel(x_col)
-                    ax.set_ylabel(y_col)
+        # Get numeric and categorical columns
+        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+        categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+        all_cols = df.columns.tolist()
+        
+        st.write("### Visualization")
+        
+        # Chart type selection
+        chart_type = st.selectbox(
+            "Chart Type",
+            ["Line", "Bar", "Scatter", "Pie", "Histogram", "Box Plot"],
+        )
+        
+        if chart_type in ["Line", "Bar", "Scatter"]:
+            # For these charts, we need X and Y axes
+            x_col = st.selectbox("X-axis", all_cols)
+            y_col = st.selectbox("Y-axis", numeric_cols)
+            
+            if x_col and y_col:
+                # Convert Y to numeric
+                df[y_col] = pd.to_numeric(df[y_col], errors="coerce")
+                chart_data = df[[x_col, y_col]].dropna()
+                
+                if not chart_data.empty:
+                    if chart_type == "Line":
+                        st.line_chart(chart_data, x=x_col, y=y_col)
+                    
+                    elif chart_type == "Bar":
+                        st.bar_chart(chart_data, x=x_col, y=y_col)
+                    
+                    elif chart_type == "Scatter":
+                        fig, ax = plt.subplots(figsize=(10, 6))
+                        ax.scatter(chart_data[x_col], chart_data[y_col], alpha=0.6)
+                        ax.set_xlabel(x_col)
+                        ax.set_ylabel(y_col)
+                        ax.set_title(f"{y_col} vs {x_col}")
+                        plt.xticks(rotation=45)
+                        st.pyplot(fig)
+                        plt.close(fig)
+                
+        elif chart_type == "Pie":
+            # For pie chart, select a categorical column
+            if categorical_cols:
+                pie_col = st.selectbox("Select column for Pie Chart", categorical_cols)
+                if pie_col:
+                    pie_data = df[pie_col].value_counts()
+                    fig, ax = plt.subplots(figsize=(10, 8))
+                    ax.pie(pie_data.values, labels=pie_data.index, autopct='%1.1f%%', startangle=90)
+                    ax.set_title(f"Distribution of {pie_col}")
                     st.pyplot(fig)
                     plt.close(fig)
+            else:
+                st.warning("No categorical columns found for pie chart. Please select a column with text data.")
+        
+        elif chart_type == "Histogram":
+            # For histogram, select a numeric column
+            if numeric_cols:
+                hist_col = st.selectbox("Select column for Histogram", numeric_cols)
+                if hist_col:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    ax.hist(df[hist_col].dropna(), bins=30, alpha=0.7, edgecolor='black')
+                    ax.set_xlabel(hist_col)
+                    ax.set_ylabel("Frequency")
+                    ax.set_title(f"Distribution of {hist_col}")
+                    st.pyplot(fig)
+                    plt.close(fig)
+            else:
+                st.warning("No numeric columns found for histogram.")
+        
+        elif chart_type == "Box Plot":
+            # For box plot, select a numeric column
+            if numeric_cols:
+                box_col = st.selectbox("Select column for Box Plot", numeric_cols)
+                if box_col:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    ax.boxplot(df[box_col].dropna())
+                    ax.set_ylabel(box_col)
+                    ax.set_title(f"Box Plot of {box_col}")
+                    st.pyplot(fig)
+                    plt.close(fig)
+            else:
+                st.warning("No numeric columns found for box plot.")
 
-                st.write("### Analysis")
-                analysis = answer_query(
-                    f"Analyze trends:\n{summary}",
-                    model_choice,
-                )
-                st.write(analysis)
+        st.write("### Analysis")
+        analysis = answer_query(
+            f"Analyze trends:\n{summary}",
+            model_choice,
+        )
+        st.write(analysis)
 
-                st.write("### Prediction")
+        st.write("### Prediction")
+        
+        # Only show prediction if we have chart data
+        if 'chart_data' in locals() and not chart_data.empty and y_col in chart_data.columns:
+            X = np.arange(len(chart_data)).reshape(-1, 1)
+            y = chart_data[y_col].values
 
-                X = np.arange(len(chart_data)).reshape(-1, 1)
-                y = chart_data[y_col].values
+            model = LinearRegression()
+            model.fit(X, y)
 
-                model = LinearRegression()
-                model.fit(X, y)
+            future = np.arange(len(X), len(X) + 5).reshape(-1, 1)
+            pred = model.predict(future)
 
-                future = np.arange(len(X), len(X) + 5).reshape(-1, 1)
-                pred = model.predict(future)
+            st.write("Future predictions:", pred)
 
-                st.write(pred)
+            pred_df = pd.DataFrame({
+                "Index": list(range(len(y) + len(pred))),
+                "Value": np.concatenate([y, pred]),
+            })
 
-                pred_df = pd.DataFrame({
-                    "Index": list(range(len(y) + len(pred))),
-                    "Value": np.concatenate([y, pred]),
-                })
+            st.line_chart(pred_df, x="Index", y="Value")
 
-                st.line_chart(pred_df, x="Index", y="Value")
-
-                report = f"""
+            report = f"""
 Explanation:
 {explanation}
 
@@ -217,15 +272,14 @@ Prediction:
 {pred}
 """
 
-                st.download_button(
-                    "Download Report",
-                    _build_pdf_report("CSV Report", report),
-                    "csv_report.pdf",
-                    "application/pdf",
-                )
-
-            else:
-                st.warning("No numeric data found for the selected Y-axis.")
+            st.download_button(
+                "Download Report",
+                _build_pdf_report("CSV Report", report),
+                "csv_report.pdf",
+                "application/pdf",
+            )
+        else:
+            st.warning("No numeric data available for prediction. Please select X and Y axes first.")
 
     elif file.name.endswith(".pdf"):
         text = ""
